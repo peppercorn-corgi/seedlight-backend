@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { config } from "../config/index.js";
+import { prisma } from "../lib/db.js";
 
 export interface AuthPayload {
   sub: string;
@@ -37,4 +38,14 @@ export function requireAuth(
   } catch {
     res.status(401).json({ error: "Invalid or expired token" });
   }
+}
+
+/**
+ * Resolve Supabase authProviderId to internal User.
+ * Returns null if user hasn't called /api/auth/sync yet.
+ */
+export async function resolveUser(authProviderId: string) {
+  return prisma.user.findFirst({
+    where: { authProviderId },
+  });
 }

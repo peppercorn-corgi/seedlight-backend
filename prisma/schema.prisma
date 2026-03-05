@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -13,7 +14,7 @@ model User {
   name           String?
   avatarUrl      String?
   authProvider   String // google, apple, email
-  authProviderId String?
+  authProviderId String?  @unique
   segment        String   @default("seeker") // seeker, new_believer, mature
   pushChannels   Json     @default("[]") // ["wechat:xxx", "email:a@b.com"]
   timezone       String   @default("Asia/Shanghai")

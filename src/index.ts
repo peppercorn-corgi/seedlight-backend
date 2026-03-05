@@ -3,6 +3,11 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import { config } from "./config/index.js";
+import authRoutes from "./routes/auth.js";
+import moodRouter from "./routes/mood.js";
+import contentRouter from "./routes/content.js";
+import audioRouter from "./routes/audio.js";
+import feedbackRouter from "./routes/feedback.js";
 
 const app = express();
 
@@ -24,21 +29,13 @@ app.get("/api/health", (_req, res) => {
 // ---------------------------------------------------------------------------
 // Route stubs
 // ---------------------------------------------------------------------------
-app.use("/api/auth", (_req, res) => {
-  res.json({ message: "auth routes - not implemented" });
-});
+app.use("/api/auth", authRoutes);
 
-app.use("/api/mood", (_req, res) => {
-  res.json({ message: "mood routes - not implemented" });
-});
+app.use("/api/mood", moodRouter);
+app.use("/api/content", contentRouter);
+app.use("/api/audio", audioRouter);
 
-app.use("/api/content", (_req, res) => {
-  res.json({ message: "content routes - not implemented" });
-});
-
-app.use("/api/feedback", (_req, res) => {
-  res.json({ message: "feedback routes - not implemented" });
-});
+app.use("/api/feedback", feedbackRouter);
 
 // ---------------------------------------------------------------------------
 // Error handler
