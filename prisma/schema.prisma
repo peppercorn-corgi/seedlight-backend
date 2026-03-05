@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String      @id @default(cuid())
+  email          String?     @unique
+  name           String?
+  avatarUrl      String?
+  authProvider   String // google, apple, email
+  authProviderId String?
+  segment        String   @default("seeker") // seeker, new_believer, mature
+  pushChannels   Json     @default("[]") // ["wechat:xxx", "email:a@b.com"]
+  timezone       String   @default("Asia/Shanghai")
+  language       String   @default("zh") // zh, en, both
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  moodEntries    MoodEntry[]
+  pushLogs       PushLog[]
+
+  @@map("users")
+}
+
+model MoodEntry {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  moodType    String // anxious, sad, grateful, confused, angry, hopeful, lonely, etc
+  moodText    String? // free text input
+  context     String? // AI-summarized recent background
+  contentCard ContentCard?
+  createdAt   DateTime     @default(now())
+
+  @@index([userId, createdAt])
+  @@map("mood_entries")
+}
+
+model ContentCard {
+  id           String    @id @default(cuid())
+  moodEntryId  String    @unique
+  moodEntry    MoodEntry @relation(fields: [moodEntryId], references: [id])
+  scriptureRef String // e.g. "Philippians 4:6-7"
+  scriptureZh  String // CUV text
+  scriptureEn  String // WEB text
+  exegesis     String // Part 1: scripture interpretation (40%)
+  secularLink  String // Part 2: cultural/secular connection (40%)
+  covenant     String // Part 3: covenant & responsibility (20%)
+  audioUrl     String? // TTS audio file path
+  language     String   @default("zh")
+  aiModel      String   @default("claude-haiku")
+  verified     Boolean  @default(false) // scripture reference verified
+  createdAt    DateTime @default(now())
+  feedbacks    Feedback[]
+  pushLogs     PushLog[]
+
+  @@map("content_cards")
+}
+
+model Feedback {
+  id            String      @id @default(cuid())
+  contentCardId String
+  contentCard   ContentCard @relation(fields: [contentCardId], references: [id])
+  userId        String
+  type          String // like, save, inappropriate
+  comment       String?
+  createdAt     DateTime    @default(now())
+
+  @@unique([contentCardId, userId, type])
+  @@map("feedbacks")
+}
+
+model ScriptureIndex {
+  id         String   @id @default(cuid())
+  book       String // e.g. "Philippians"
+  bookZh     String // e.g. "腓立比书"
+  chapter    Int
+  verseStart Int
+  verseEnd   Int?
+  textZh     String // CUV text
+  textEn     String // WEB text
+  themes     String[] // ["anxiety", "trust", "provision"]
+  moodTags   String[] // ["anxious", "worried", "stressed"]
+  importance Int      @default(0) // 0-10, for prioritization
+
+  @@index([moodTags])
+  @@index([themes])
+  @@map("scripture_index")
+}
+
+model PushLog {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  contentCardId String
+  contentCard   ContentCard @relation(fields: [contentCardId], references: [id])
+  channel       String // wechat, whatsapp, email, pwa
+  status        String      @default("pending") // pending, sent, delivered, failed
+  sentAt        DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([userId, createdAt])
+  @@map("push_logs")
+}
