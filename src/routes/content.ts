@@ -5,6 +5,36 @@ import { prisma } from "../lib/db.js";
 
 const router = Router();
 
+// GET /api/content/shared/:id - public endpoint for shared content (no auth)
+router.get("/shared/:id", async (req, res, next) => {
+  try {
+    const id = req.params.id as string;
+    const card = await prisma.contentCard.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        scriptureRef: true,
+        scriptureZh: true,
+        scriptureEn: true,
+        exegesis: true,
+        secularLink: true,
+        covenant: true,
+        verified: true,
+        createdAt: true,
+      },
+    });
+
+    if (!card) {
+      res.status(404).json({ error: "Content card not found" });
+      return;
+    }
+
+    res.json(card);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/content/:id - get specific content card
 router.get("/:id", requireAuth, async (req, res, next) => {
   try {
