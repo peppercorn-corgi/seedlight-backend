@@ -17,16 +17,27 @@ export async function findByReference(ref: string) {
   const [, bookRaw, chapterStr, verseStartStr, verseEndStr] = match;
   const chapter = parseInt(chapterStr, 10);
   const verseStart = parseInt(verseStartStr, 10);
-  const verseEnd = verseEndStr ? parseInt(verseEndStr, 10) : undefined;
+  const verseEnd = verseEndStr ? parseInt(verseEndStr, 10) : verseStart;
 
-  return prisma.scriptureIndex.findFirst({
+  // Query all individual verses in the range
+  const verses = await prisma.scriptureIndex.findMany({
     where: {
       OR: [{ book: bookRaw }, { bookZh: bookRaw }],
       chapter,
-      verseStart,
-      ...(verseEnd !== undefined ? { verseEnd } : {}),
+      verseStart: { gte: verseStart, lte: verseEnd },
     },
+    orderBy: { verseStart: "asc" },
   });
+
+  if (verses.length === 0) return null;
+
+  // Combine text from all verses in the range
+  return {
+    ...verses[0],
+    verseEnd: verseEnd > verseStart ? verseEnd : null,
+    textZh: verses.map((v) => v.textZh).join(""),
+    textEn: verses.map((v) => v.textEn).join(" "),
+  };
 }
 
 export async function verifyReference(
