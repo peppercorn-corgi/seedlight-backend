@@ -4,6 +4,10 @@ import { EdgeTTS } from "node-edge-tts";
 import { prisma } from "../lib/db.js";
 
 const AUDIO_DIR = path.resolve("public/audio");
+const TTS_MAX_RETRIES = 2;
+
+// Track IDs currently being generated so the route can return 202
+const generating = new Set<string>();
 
 // Ensure audio directory exists
 fs.mkdirSync(AUDIO_DIR, { recursive: true });
@@ -15,15 +19,32 @@ function buildTtsText(card: {
   secularLink: string;
   covenant: string;
 }): string {
-  // Build a natural reading flow with pauses (SSML-style periods for natural breaks)
   const sections = [
     `${card.scriptureRef}。${card.scriptureZh}`,
     card.exegesis,
     card.secularLink,
     card.covenant,
   ];
-  // Join sections with a longer pause (double period creates a natural pause in TTS)
   return sections.join("。。");
+}
+
+async function ttsWithRetry(text: string, audioPath: string): Promise<void> {
+  for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
+    try {
+      const tts = new EdgeTTS({ voice: "zh-CN-XiaoxiaoNeural" });
+      await tts.ttsPromise(text, audioPath);
+      return;
+    } catch (err) {
+      console.error(`[audio] TTS attempt ${attempt}/${TTS_MAX_RETRIES} failed:`, err);
+      // Clean up partial file
+      if (fs.existsSync(audioPath)) {
+        fs.unlinkSync(audioPath);
+      }
+      if (attempt === TTS_MAX_RETRIES) throw err;
+      // Brief pause before retry
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
 }
 
 /**
@@ -42,9 +63,9 @@ export async function generateAudio(contentCardId: string): Promise<string | nul
   const text = buildTtsText(card);
   const audioPath = path.join(AUDIO_DIR, `${contentCardId}.mp3`);
 
+  generating.add(contentCardId);
   try {
-    const tts = new EdgeTTS({ voice: "zh-CN-XiaoxiaoNeural" });
-    await tts.ttsPromise(text, audioPath);
+    await ttsWithRetry(text, audioPath);
 
     const audioUrl = `/api/audio/${contentCardId}`;
     await prisma.contentCard.update({
@@ -52,15 +73,24 @@ export async function generateAudio(contentCardId: string): Promise<string | nul
       data: { audioUrl },
     });
 
+    console.log(`[audio] Generated audio for ${contentCardId}`);
     return audioUrl;
   } catch (err) {
     console.error(`[audio] TTS generation failed for ${contentCardId}:`, err);
-    // Clean up partial file if it exists
     if (fs.existsSync(audioPath)) {
       fs.unlinkSync(audioPath);
     }
     return null;
+  } finally {
+    generating.delete(contentCardId);
   }
+}
+
+/**
+ * Check whether audio is currently being generated for a card.
+ */
+export function isAudioGenerating(contentCardId: string): boolean {
+  return generating.has(contentCardId);
 }
 
 /**

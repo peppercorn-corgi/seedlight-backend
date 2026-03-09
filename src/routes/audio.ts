@@ -1,7 +1,7 @@
 import { Router } from "express";
 import fs from "node:fs";
 import { requireAuth } from "../middleware/auth.js";
-import { generateAudio, getAudioFilePath } from "../services/audio.js";
+import { generateAudio, getAudioFilePath, isAudioGenerating } from "../services/audio.js";
 
 const router = Router();
 
@@ -21,7 +21,12 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
     const filePath = getAudioFilePath(contentCardId);
 
     if (!filePath) {
-      res.status(404).json({ error: "Audio not found" });
+      // Tell the client whether audio is still being generated or truly missing
+      if (isAudioGenerating(contentCardId)) {
+        res.status(202).json({ status: "generating" });
+      } else {
+        res.status(404).json({ error: "Audio not found" });
+      }
       return;
     }
 
