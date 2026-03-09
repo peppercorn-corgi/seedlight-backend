@@ -12,7 +12,7 @@ const syncSchema = z.object({
 });
 
 const updateSchema = z.object({
-  segment: z.enum(["seeker", "new_believer", "mature"]).optional(),
+  segment: z.enum(["seeker", "new_believer", "growing", "mature"]).optional(),
   pushChannels: z.array(z.string().max(100)).max(10).optional(),
   timezone: z.string().max(50).optional(),
   language: z.enum(["zh", "en", "both"]).optional(),

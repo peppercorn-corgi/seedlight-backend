@@ -15,7 +15,7 @@ model User {
   avatarUrl      String?
   authProvider   String // google, apple, email
   authProviderId String   @unique
-  segment        String   @default("seeker") // seeker, new_believer, mature
+  segment        String   @default("seeker") // seeker, new_believer, growing, mature
   pushChannels   Json     @default("[]") // ["wechat:xxx", "email:a@b.com"]
   timezone       String   @default("Asia/Shanghai")
   language       String   @default("zh") // zh, en, both
