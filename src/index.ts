@@ -22,7 +22,7 @@ app.set("trust proxy", 1);
 // ---------------------------------------------------------------------------
 app.use(helmet());
 app.use(cors({
-  origin: config.CORS_ORIGIN.split(",").map((o) => o.trim()),
+  origin: config.CORS_ORIGIN === "*" ? true : config.CORS_ORIGIN.split(",").map((o) => o.trim()),
   credentials: true,
 }));
 app.use(morgan(config.NODE_ENV === "production" ? "combined" : "dev"));
