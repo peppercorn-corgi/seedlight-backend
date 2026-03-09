@@ -1,7 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import { createClient } from "@supabase/supabase-js";
 import { config } from "../config/index.js";
 import { prisma } from "../lib/db.js";
+
+const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
 
 export interface AuthPayload {
   sub: string;
@@ -31,13 +33,24 @@ export function requireAuth(
 
   const token = header.slice(7);
 
-  try {
-    const payload = jwt.verify(token, config.SUPABASE_JWT_SECRET) as AuthPayload;
-    req.user = payload;
-    next();
-  } catch {
-    res.status(401).json({ error: "Invalid or expired token" });
-  }
+  supabase.auth
+    .getUser(token)
+    .then(({ data, error }) => {
+      if (error || !data.user) {
+        res.status(401).json({ error: "Invalid or expired token" });
+        return;
+      }
+
+      req.user = {
+        sub: data.user.id,
+        email: data.user.email,
+        role: data.user.role,
+      };
+      next();
+    })
+    .catch(() => {
+      res.status(401).json({ error: "Invalid or expired token" });
+    });
 }
 
 /**

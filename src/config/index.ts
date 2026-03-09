@@ -6,8 +6,10 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_KEY: z.string().min(1),
-  SUPABASE_JWT_SECRET: z.string().min(1),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  LLM_PROVIDER: z.enum(["claude-api", "claude-cli", "gemini"]).default("claude-api"),
+  LLM_MODEL: z.string().optional(),
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z
     .enum(["development", "production", "test"])
