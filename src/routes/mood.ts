@@ -15,7 +15,7 @@ const VALID_MOODS = [
 ] as const;
 
 const moodSubmitSchema = z.object({
-  moodType: z.string().optional(),
+  moodType: z.enum(VALID_MOODS).optional(),
   moodText: z.string().max(500).optional(),
 }).refine((data) => data.moodType || data.moodText, {
   message: "Either moodType or moodText must be provided",
@@ -36,7 +36,8 @@ router.post("/", requireAuth, async (req, res, next) => {
       return;
     }
 
-    let { moodType, moodText } = parsed.data;
+    const { moodText } = parsed.data;
+    let moodType: string | undefined = parsed.data.moodType;
 
     // If no moodType but has moodText, classify from text
     if (!moodType && moodText) {
