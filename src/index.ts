@@ -22,7 +22,19 @@ app.set("trust proxy", 1);
 // ---------------------------------------------------------------------------
 app.use(helmet());
 app.use(cors({
-  origin: config.CORS_ORIGIN === "*" ? true : config.CORS_ORIGIN.split(",").map((o) => o.trim()),
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (config.CORS_ORIGIN === "*") return callback(null, true);
+    // Support wildcard subdomain matching, e.g. ".myseedlight.com"
+    const allowed = config.CORS_ORIGIN.split(",").map((o) => o.trim());
+    const isAllowed = allowed.some((pattern) =>
+      pattern.startsWith(".")
+        ? origin.endsWith(pattern) || origin.endsWith(`://${pattern.slice(1)}`)
+        : origin === pattern,
+    );
+    callback(isAllowed ? null : new Error("CORS not allowed"), isAllowed);
+  },
   credentials: true,
 }));
 app.use(morgan(config.NODE_ENV === "production" ? "combined" : "dev"));
