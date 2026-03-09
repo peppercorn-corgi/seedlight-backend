@@ -45,7 +45,7 @@ app.use(express.json({ limit: "16kb" }));
 // ---------------------------------------------------------------------------
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 100,
+  limit: 1000,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later" },
@@ -54,7 +54,7 @@ app.use("/api", globalLimiter);
 
 const llmLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 10,
+  limit: 60,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many requests, please slow down" },
@@ -62,7 +62,7 @@ const llmLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 5,
+  limit: 30,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later" },
