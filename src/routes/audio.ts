@@ -18,26 +18,32 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
       return;
     }
 
+    const stillGenerating = isAudioGenerating(contentCardId);
     const filePath = getAudioFilePath(contentCardId);
 
-    if (!filePath) {
-      if (isAudioGenerating(contentCardId)) {
-        res.status(202).json({ status: "generating" });
-      } else {
-        // Trigger on-demand generation
-        generateAudio(contentCardId).catch((err) =>
-          console.error(`[audio] On-demand generation failed for ${contentCardId}:`, err),
-        );
-        res.status(202).json({ status: "generating" });
-      }
+    if (!filePath && !stillGenerating) {
+      // Trigger on-demand generation
+      generateAudio(contentCardId).catch((err) =>
+        console.error(`[audio] On-demand generation failed for ${contentCardId}:`, err),
+      );
+      res.status(202).json({ status: "generating" });
       return;
     }
 
+    if (!filePath) {
+      // Generating but no file yet (first chunk not written)
+      res.status(202).json({ status: "generating" });
+      return;
+    }
+
+    // File exists — serve it (may be partial if still generating)
     const stat = fs.statSync(filePath);
     const range = req.headers.range;
 
+    // Custom header tells frontend whether more audio chunks are coming
+    const extraHeaders = stillGenerating ? { "X-Audio-Partial": "true" } : {};
+
     if (range) {
-      // Support Range requests for seeking
       const parts = range.replace(/bytes=/, "").split("-");
       const start = parseInt(parts[0], 10);
       const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
@@ -48,6 +54,7 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
         "Accept-Ranges": "bytes",
         "Content-Length": chunkSize,
         "Content-Type": "audio/mpeg",
+        ...extraHeaders,
       });
       fs.createReadStream(filePath, { start, end }).pipe(res);
     } else {
@@ -55,6 +62,7 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
         "Content-Length": stat.size,
         "Content-Type": "audio/mpeg",
         "Accept-Ranges": "bytes",
+        ...extraHeaders,
       });
       fs.createReadStream(filePath).pipe(res);
     }

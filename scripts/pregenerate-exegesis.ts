@@ -146,7 +146,9 @@ function fixJsonNewlines(str: string): string {
 // Extract segment values by key boundaries (avoids JSON.parse issues with
 // unescaped quotes in LLM output)
 // ---------------------------------------------------------------------------
-function extractSegments(raw: string): Record<string, string> | null {
+function extractSegments(rawInput: string): Record<string, string> | null {
+  // Strip markdown code block wrappers if present
+  const raw = rawInput.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "");
   const result: Record<string, string> = {};
 
   for (let i = 0; i < SEGMENTS.length; i++) {

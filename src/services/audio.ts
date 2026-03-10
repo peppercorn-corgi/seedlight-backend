@@ -20,8 +20,40 @@ const ttsClient = process.env.GOOGLE_TTS_CREDENTIALS
   : new TextToSpeechClient();
 console.log(`[audio] TTS provider: Google Cloud (credentials: ${hasCredentials ? "configured" : "missing"})`);
 
-// Max chars per TTS request (Chirp3:HD has sentence length limits)
-const TTS_CHUNK_MAX = 500;
+// Chirp3:HD sentence limit is ~200 chars; keep chunks well under that
+const TTS_CHUNK_MAX = 150;
+
+/**
+ * Split text into chunks safe for Chirp3:HD.
+ * 1. Split on sentence-ending punctuation (。！？；\n)
+ * 2. If still too long, split on commas (，、)
+ * 3. If STILL too long, hard-split at TTS_CHUNK_MAX
+ */
+function splitToSentences(text: string): string[] {
+  // First pass: split on strong punctuation
+  const parts = text.split(/(?<=[。！？；\n])/g).filter((s) => s.trim());
+
+  const result: string[] = [];
+  for (const part of parts) {
+    if (part.length <= TTS_CHUNK_MAX) {
+      result.push(part);
+      continue;
+    }
+    // Second pass: split on commas
+    const subParts = part.split(/(?<=[，、])/g).filter((s) => s.trim());
+    for (const sub of subParts) {
+      if (sub.length <= TTS_CHUNK_MAX) {
+        result.push(sub);
+        continue;
+      }
+      // Hard split at max length
+      for (let i = 0; i < sub.length; i += TTS_CHUNK_MAX) {
+        result.push(sub.slice(i, i + TTS_CHUNK_MAX));
+      }
+    }
+  }
+  return result;
+}
 
 function buildTtsChunks(card: {
   scriptureZh: string;
@@ -37,10 +69,9 @@ function buildTtsChunks(card: {
     card.covenant,
   ].join("。");
 
-  // Split on sentence-ending punctuation, keep delimiter attached
-  const sentences = raw.split(/(?<=[。！？；\n])/g).filter((s) => s.trim());
+  const sentences = splitToSentences(raw);
 
-  // Merge short sentences into chunks under the limit
+  // Merge very short sentences into chunks under the limit
   const chunks: string[] = [];
   let buf = "";
   for (const s of sentences) {
@@ -76,35 +107,14 @@ async function synthesizeChunk(text: string): Promise<Buffer> {
   return response.audioContent as Buffer;
 }
 
-async function synthesize(chunks: string[], audioPath: string): Promise<void> {
-  const buffers: Buffer[] = [];
-  for (const chunk of chunks) {
-    buffers.push(await synthesizeChunk(chunk));
-  }
-  fs.writeFileSync(audioPath, Buffer.concat(buffers));
-}
-
-async function ttsWithRetry(chunks: string[], audioPath: string): Promise<void> {
-  for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
-    try {
-      await synthesize(chunks, audioPath);
-      return;
-    } catch (err) {
-      console.error(`[audio] TTS attempt ${attempt}/${TTS_MAX_RETRIES} failed:`, err);
-      if (fs.existsSync(audioPath)) {
-        fs.unlinkSync(audioPath);
-      }
-      if (attempt === TTS_MAX_RETRIES) throw err;
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
-}
-
 /**
  * Generate TTS audio for a ContentCard and save as MP3.
+ * Writes each chunk incrementally so the file can be played while generating.
  * Returns the audio URL path, or null if generation fails.
  */
 export async function generateAudio(contentCardId: string): Promise<string | null> {
+  if (generating.has(contentCardId)) return null;
+
   const card = await prisma.contentCard.findUnique({
     where: { id: contentCardId },
   });
@@ -118,7 +128,26 @@ export async function generateAudio(contentCardId: string): Promise<string | nul
 
   generating.add(contentCardId);
   try {
-    await ttsWithRetry(chunks, audioPath);
+    // Remove any stale partial file
+    if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+
+    // Generate and append each chunk incrementally
+    for (let i = 0; i < chunks.length; i++) {
+      let buf: Buffer | null = null;
+      for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
+        try {
+          buf = await synthesizeChunk(chunks[i]);
+          break;
+        } catch (err) {
+          console.error(`[audio] Chunk ${i + 1}/${chunks.length} attempt ${attempt}/${TTS_MAX_RETRIES} failed:`, (err as Error).message);
+          if (attempt === TTS_MAX_RETRIES) throw err;
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+      if (buf) {
+        fs.appendFileSync(audioPath, buf);
+      }
+    }
 
     const audioUrl = `/api/audio/${contentCardId}`;
     await prisma.contentCard.update({
@@ -126,10 +155,10 @@ export async function generateAudio(contentCardId: string): Promise<string | nul
       data: { audioUrl },
     });
 
-    console.log(`[audio] Generated audio for ${contentCardId}`);
+    console.log(`[audio] Generated audio for ${contentCardId} (${chunks.length} chunks)`);
     return audioUrl;
   } catch (err) {
-    console.error(`[audio] TTS generation failed for ${contentCardId}:`, err);
+    console.error(`[audio] TTS generation failed for ${contentCardId}:`, (err as Error).message);
     if (fs.existsSync(audioPath)) {
       fs.unlinkSync(audioPath);
     }
