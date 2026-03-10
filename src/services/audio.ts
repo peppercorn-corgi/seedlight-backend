@@ -14,9 +14,11 @@ fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
 // Google Cloud TTS client
 // Supports: GOOGLE_APPLICATION_CREDENTIALS (file path) or GOOGLE_TTS_CREDENTIALS (JSON string)
+const hasCredentials = !!(process.env.GOOGLE_TTS_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS);
 const ttsClient = process.env.GOOGLE_TTS_CREDENTIALS
   ? new TextToSpeechClient({ credentials: JSON.parse(process.env.GOOGLE_TTS_CREDENTIALS) })
   : new TextToSpeechClient();
+console.log(`[audio] TTS provider: Google Cloud (credentials: ${hasCredentials ? "configured" : "missing"})`);
 
 function buildTtsText(card: {
   scriptureZh: string;

@@ -4,6 +4,15 @@ import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import { config } from "./config/index.js";
+
+// Add timestamps to all console output
+const origLog = console.log;
+const origError = console.error;
+const origWarn = console.warn;
+const ts = () => new Date().toISOString();
+console.log = (...args: unknown[]) => origLog(`[${ts()}]`, ...args);
+console.error = (...args: unknown[]) => origError(`[${ts()}]`, ...args);
+console.warn = (...args: unknown[]) => origWarn(`[${ts()}]`, ...args);
 import authRoutes from "./routes/auth.js";
 import moodRouter from "./routes/mood.js";
 import contentRouter from "./routes/content.js";
