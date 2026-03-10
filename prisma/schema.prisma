@@ -16,6 +16,7 @@ model User {
   authProvider   String // google, apple, email
   authProviderId String   @unique
   segment        String   @default("seeker") // seeker, new_believer, growing, mature
+  onboarded      Boolean  @default(false)
   pushChannels   Json     @default("[]") // ["wechat:xxx", "email:a@b.com"]
   timezone       String   @default("Asia/Shanghai")
   language       String   @default("zh") // zh, en, both

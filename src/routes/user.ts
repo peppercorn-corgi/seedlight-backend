@@ -16,7 +16,7 @@ router.get("/preferences", requireAuth, async (req, res, next) => {
   try {
     const user = await prisma.user.findFirst({
       where: { authProviderId: req.user!.sub },
-      select: { segment: true },
+      select: { segment: true, onboarded: true },
     });
 
     if (!user) {
@@ -24,7 +24,7 @@ router.get("/preferences", requireAuth, async (req, res, next) => {
       return;
     }
 
-    res.json({ faithLevel: user.segment });
+    res.json({ faithLevel: user.segment, onboarded: user.onboarded });
   } catch (err) {
     next(err);
   }
@@ -50,10 +50,10 @@ router.put("/preferences", requireAuth, async (req, res, next) => {
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { segment: parsed.data.faithLevel },
+      data: { segment: parsed.data.faithLevel, onboarded: true },
     });
 
-    res.json({ faithLevel: parsed.data.faithLevel });
+    res.json({ faithLevel: parsed.data.faithLevel, onboarded: true });
   } catch (err) {
     next(err);
   }
