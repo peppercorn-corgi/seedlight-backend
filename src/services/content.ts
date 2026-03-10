@@ -86,21 +86,49 @@ interface PartialAiResponse {
 
 function parsePartialResponse(text: string): PartialAiResponse {
   const cleaned = text.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
-  let parsed;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("No JSON object in response");
-    parsed = JSON.parse(match[0]);
-  }
 
-  for (const key of ["secularLink", "covenant"] as const) {
-    if (typeof parsed[key] !== "string" || parsed[key].trim() === "") {
+  // Try JSON.parse first
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (typeof parsed.secularLink === "string" && typeof parsed.covenant === "string") {
+      return parsed as PartialAiResponse;
+    }
+  } catch { /* fall through to key-boundary extraction */ }
+
+  // Key-boundary extraction (handles unescaped quotes in LLM output)
+  const keys = ["secularLink", "covenant"] as const;
+  const result: Record<string, string> = {};
+
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const keyPattern = new RegExp(`"${key}"\\s*:\\s*"`);
+    const keyMatch = cleaned.match(keyPattern);
+    if (!keyMatch || keyMatch.index === undefined) {
       throw new Error(`Missing field: ${key}`);
     }
+    const valueStart = keyMatch.index + keyMatch[0].length;
+
+    let valueEnd: number;
+    const nextKey = keys[i + 1];
+    if (nextKey) {
+      const endPattern = new RegExp(`",?\\s*"${nextKey}"\\s*:`);
+      const endMatch = cleaned.slice(valueStart).match(endPattern);
+      if (!endMatch || endMatch.index === undefined) {
+        throw new Error(`Cannot find boundary for ${key}`);
+      }
+      valueEnd = valueStart + endMatch.index;
+    } else {
+      const endMatch = cleaned.slice(valueStart).match(/"\s*\}/);
+      if (!endMatch || endMatch.index === undefined) {
+        throw new Error(`Cannot find end of ${key}`);
+      }
+      valueEnd = valueStart + endMatch.index;
+    }
+
+    result[key] = cleaned.slice(valueStart, valueEnd).replace(/\n/g, "");
   }
-  return parsed as PartialAiResponse;
+
+  return result as unknown as PartialAiResponse;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,15 +261,49 @@ interface FullAiResponse {
 
 function parseFullResponse(text: string): FullAiResponse {
   const cleaned = text.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
-  const parsed = JSON.parse(cleaned);
 
-  const required = ["scriptureRef", "scriptureZh", "scriptureEn", "exegesis", "secularLink", "covenant"] as const;
-  for (const key of required) {
-    if (typeof parsed[key] !== "string" || parsed[key].trim() === "") {
-      throw new Error(`AI response missing or empty field: ${key}`);
+  // Try JSON.parse first
+  try {
+    const parsed = JSON.parse(cleaned);
+    const required = ["scriptureRef", "scriptureZh", "scriptureEn", "exegesis", "secularLink", "covenant"] as const;
+    const allPresent = required.every((k) => typeof parsed[k] === "string" && parsed[k].trim() !== "");
+    if (allPresent) return parsed as FullAiResponse;
+  } catch { /* fall through to key-boundary extraction */ }
+
+  // Key-boundary extraction
+  const keys = ["scriptureRef", "scriptureZh", "scriptureEn", "exegesis", "secularLink", "covenant"] as const;
+  const result: Record<string, string> = {};
+
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const keyPattern = new RegExp(`"${key}"\\s*:\\s*"`);
+    const keyMatch = cleaned.match(keyPattern);
+    if (!keyMatch || keyMatch.index === undefined) {
+      throw new Error(`AI response missing field: ${key}`);
     }
+    const valueStart = keyMatch.index + keyMatch[0].length;
+
+    let valueEnd: number;
+    const nextKey = keys[i + 1];
+    if (nextKey) {
+      const endPattern = new RegExp(`",?\\s*"${nextKey}"\\s*:`);
+      const endMatch = cleaned.slice(valueStart).match(endPattern);
+      if (!endMatch || endMatch.index === undefined) {
+        throw new Error(`Cannot find boundary for ${key}`);
+      }
+      valueEnd = valueStart + endMatch.index;
+    } else {
+      const endMatch = cleaned.slice(valueStart).match(/"\s*\}/);
+      if (!endMatch || endMatch.index === undefined) {
+        throw new Error(`Cannot find end of ${key}`);
+      }
+      valueEnd = valueStart + endMatch.index;
+    }
+
+    result[key] = cleaned.slice(valueStart, valueEnd).replace(/\n/g, "");
   }
-  return parsed as FullAiResponse;
+
+  return result as unknown as FullAiResponse;
 }
 
 async function generateLegacy(
