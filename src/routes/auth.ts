@@ -42,23 +42,33 @@ router.post("/sync", requireAuth, async (req, res, next) => {
     const { sub, email } = req.user!;
     const { name, avatarUrl, authProvider } = parsed.data;
 
-    const user = await prisma.user.upsert({
-      where: { authProviderId: sub },
-      update: {
-        email: email ?? undefined,
-        name: name ?? undefined,
-        avatarUrl: avatarUrl ?? undefined,
-      },
-      create: {
-        email: email ?? null,
-        name: name ?? null,
-        avatarUrl: avatarUrl ?? null,
-        authProvider: authProvider ?? "email",
-        authProviderId: sub,
-        segment: "seeker",
-      },
-      select: userSelect,
+    // Find by authProviderId first, then by email (handles Supabase account re-creation)
+    let user = await prisma.user.findFirst({
+      where: { OR: [{ authProviderId: sub }, ...(email ? [{ email }] : [])] },
     });
+
+    if (user) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          authProviderId: sub,
+          email: email ?? undefined,
+          name: name ?? undefined,
+          avatarUrl: avatarUrl ?? undefined,
+        },
+      });
+    } else {
+      user = await prisma.user.create({
+        data: {
+          email: email ?? null,
+          name: name ?? null,
+          avatarUrl: avatarUrl ?? null,
+          authProvider: authProvider ?? "email",
+          authProviderId: sub,
+          segment: "seeker",
+        },
+      });
+    }
 
     res.json(user);
   } catch (err) {
