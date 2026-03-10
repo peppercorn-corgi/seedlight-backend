@@ -20,23 +20,41 @@ const ttsClient = process.env.GOOGLE_TTS_CREDENTIALS
   : new TextToSpeechClient();
 console.log(`[audio] TTS provider: Google Cloud (credentials: ${hasCredentials ? "configured" : "missing"})`);
 
-function buildTtsText(card: {
+// Max chars per TTS request (Chirp3:HD has sentence length limits)
+const TTS_CHUNK_MAX = 500;
+
+function buildTtsChunks(card: {
   scriptureZh: string;
   scriptureRef: string;
   exegesis: string;
   secularLink: string;
   covenant: string;
-}): string {
-  const sections = [
+}): string[] {
+  const raw = [
     `${card.scriptureRef}。${card.scriptureZh}`,
     card.exegesis,
     card.secularLink,
     card.covenant,
-  ];
-  return sections.join("。。");
+  ].join("。");
+
+  // Split on sentence-ending punctuation, keep delimiter attached
+  const sentences = raw.split(/(?<=[。！？；\n])/g).filter((s) => s.trim());
+
+  // Merge short sentences into chunks under the limit
+  const chunks: string[] = [];
+  let buf = "";
+  for (const s of sentences) {
+    if (buf.length + s.length > TTS_CHUNK_MAX && buf) {
+      chunks.push(buf);
+      buf = "";
+    }
+    buf += s;
+  }
+  if (buf) chunks.push(buf);
+  return chunks;
 }
 
-async function synthesize(text: string, audioPath: string): Promise<void> {
+async function synthesizeChunk(text: string): Promise<Buffer> {
   const request: protos.google.cloud.texttospeech.v1.ISynthesizeSpeechRequest = {
     input: { text },
     voice: {
@@ -55,13 +73,21 @@ async function synthesize(text: string, audioPath: string): Promise<void> {
     throw new Error("Google TTS returned empty audio content");
   }
 
-  fs.writeFileSync(audioPath, response.audioContent as Buffer);
+  return response.audioContent as Buffer;
 }
 
-async function ttsWithRetry(text: string, audioPath: string): Promise<void> {
+async function synthesize(chunks: string[], audioPath: string): Promise<void> {
+  const buffers: Buffer[] = [];
+  for (const chunk of chunks) {
+    buffers.push(await synthesizeChunk(chunk));
+  }
+  fs.writeFileSync(audioPath, Buffer.concat(buffers));
+}
+
+async function ttsWithRetry(chunks: string[], audioPath: string): Promise<void> {
   for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
     try {
-      await synthesize(text, audioPath);
+      await synthesize(chunks, audioPath);
       return;
     } catch (err) {
       console.error(`[audio] TTS attempt ${attempt}/${TTS_MAX_RETRIES} failed:`, err);
@@ -87,12 +113,12 @@ export async function generateAudio(contentCardId: string): Promise<string | nul
     throw new Error(`ContentCard not found: ${contentCardId}`);
   }
 
-  const text = buildTtsText(card);
+  const chunks = buildTtsChunks(card);
   const audioPath = path.join(AUDIO_DIR, `${contentCardId}.mp3`);
 
   generating.add(contentCardId);
   try {
-    await ttsWithRetry(text, audioPath);
+    await ttsWithRetry(chunks, audioPath);
 
     const audioUrl = `/api/audio/${contentCardId}`;
     await prisma.contentCard.update({
