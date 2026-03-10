@@ -21,11 +21,14 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
     const filePath = getAudioFilePath(contentCardId);
 
     if (!filePath) {
-      // Tell the client whether audio is still being generated or truly missing
       if (isAudioGenerating(contentCardId)) {
         res.status(202).json({ status: "generating" });
       } else {
-        res.status(404).json({ error: "Audio not found" });
+        // Trigger on-demand generation
+        generateAudio(contentCardId).catch((err) =>
+          console.error(`[audio] On-demand generation failed for ${contentCardId}:`, err),
+        );
+        res.status(202).json({ status: "generating" });
       }
       return;
     }

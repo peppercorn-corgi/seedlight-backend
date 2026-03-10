@@ -41,7 +41,7 @@ async function synthesize(text: string, audioPath: string): Promise<void> {
     input: { text },
     voice: {
       languageCode: "cmn-CN",
-      name: "cmn-CN-Standard-A", // Female standard voice
+      name: "cmn-CN-Chirp3-HD-Leda",
     },
     audioConfig: {
       audioEncoding: "MP3" as unknown as protos.google.cloud.texttospeech.v1.AudioEncoding,

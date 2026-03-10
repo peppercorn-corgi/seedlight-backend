@@ -2,7 +2,6 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAuth, resolveUser } from "../middleware/auth.js";
 import { generateContent } from "../services/content.js";
-import { generateAudio } from "../services/audio.js";
 import { classifyMood, analyzeMoodTrend } from "../services/mood.js";
 import { prisma } from "../lib/db.js";
 
@@ -72,10 +71,7 @@ router.post("/", requireAuth, async (req, res, next) => {
       },
     });
 
-    // Fire-and-forget: generate audio in background (don't block the response)
-    generateAudio(contentCard.id).catch((err) =>
-      console.error(`[audio] Background generation failed for ${contentCard.id}:`, err),
-    );
+    // Audio is generated on-demand when user clicks play (POST /api/audio/:id/generate)
 
     res.status(201).json({
       moodEntry: {
