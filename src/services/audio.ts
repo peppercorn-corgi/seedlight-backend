@@ -1,6 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
-import { EdgeTTS } from "node-edge-tts";
+import { TextToSpeechClient, protos } from "@google-cloud/text-to-speech";
 import { prisma } from "../lib/db.js";
 
 const AUDIO_DIR = path.resolve("public/audio");
@@ -11,6 +11,12 @@ const generating = new Set<string>();
 
 // Ensure audio directory exists
 fs.mkdirSync(AUDIO_DIR, { recursive: true });
+
+// Google Cloud TTS client
+// Supports: GOOGLE_APPLICATION_CREDENTIALS (file path) or GOOGLE_TTS_CREDENTIALS (JSON string)
+const ttsClient = process.env.GOOGLE_TTS_CREDENTIALS
+  ? new TextToSpeechClient({ credentials: JSON.parse(process.env.GOOGLE_TTS_CREDENTIALS) })
+  : new TextToSpeechClient();
 
 function buildTtsText(card: {
   scriptureZh: string;
@@ -28,20 +34,39 @@ function buildTtsText(card: {
   return sections.join("。。");
 }
 
+async function synthesize(text: string, audioPath: string): Promise<void> {
+  const request: protos.google.cloud.texttospeech.v1.ISynthesizeSpeechRequest = {
+    input: { text },
+    voice: {
+      languageCode: "cmn-CN",
+      name: "cmn-CN-Standard-A", // Female standard voice
+    },
+    audioConfig: {
+      audioEncoding: "MP3" as unknown as protos.google.cloud.texttospeech.v1.AudioEncoding,
+      speakingRate: 0.95,
+    },
+  };
+
+  const [response] = await ttsClient.synthesizeSpeech(request);
+
+  if (!response.audioContent) {
+    throw new Error("Google TTS returned empty audio content");
+  }
+
+  fs.writeFileSync(audioPath, response.audioContent as Buffer);
+}
+
 async function ttsWithRetry(text: string, audioPath: string): Promise<void> {
   for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
     try {
-      const tts = new EdgeTTS({ voice: "zh-CN-XiaoxiaoNeural" });
-      await tts.ttsPromise(text, audioPath);
+      await synthesize(text, audioPath);
       return;
     } catch (err) {
       console.error(`[audio] TTS attempt ${attempt}/${TTS_MAX_RETRIES} failed:`, err);
-      // Clean up partial file
       if (fs.existsSync(audioPath)) {
         fs.unlinkSync(audioPath);
       }
       if (attempt === TTS_MAX_RETRIES) throw err;
-      // Brief pause before retry
       await new Promise((r) => setTimeout(r, 1000));
     }
   }

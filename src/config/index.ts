@@ -10,6 +10,8 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1).optional(),
   LLM_PROVIDER: z.enum(["claude-api", "claude-cli", "gemini"]).default("claude-api"),
   LLM_MODEL: z.string().optional(),
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
+  GOOGLE_TTS_CREDENTIALS: z.string().optional(),
   CORS_ORIGIN: z.string().default("http://localhost:3003"),
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z

@@ -29,7 +29,6 @@ const logStream = fs.createWriteStream(LOG_FILE, { flags: "a" });
 
 function log(msg: string) {
   const line = `[${new Date().toISOString()}] ${msg}`;
-  console.log(line);
   logStream.write(line + "\n");
 }
 
@@ -125,6 +124,66 @@ const SYSTEM_PROMPT = `你是一位温柔、有智慧的牧者，持守基督教
 只返回JSON，不要解释。`;
 
 // ---------------------------------------------------------------------------
+// Fix literal newlines inside JSON string values
+// ---------------------------------------------------------------------------
+function fixJsonNewlines(str: string): string {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (escaped) { result += ch; escaped = false; continue; }
+    if (ch === "\\") { result += ch; escaped = true; continue; }
+    if (ch === '"') { inString = !inString; result += ch; continue; }
+    if (inString && ch === "\n") { result += "\\n"; continue; }
+    if (inString && ch === "\r") { result += "\\r"; continue; }
+    result += ch;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Extract segment values by key boundaries (avoids JSON.parse issues with
+// unescaped quotes in LLM output)
+// ---------------------------------------------------------------------------
+function extractSegments(raw: string): Record<string, string> | null {
+  const result: Record<string, string> = {};
+
+  for (let i = 0; i < SEGMENTS.length; i++) {
+    const key = SEGMENTS[i];
+    // Find "key": " pattern
+    const keyPattern = new RegExp(`"${key}"\\s*:\\s*"`);
+    const keyMatch = raw.match(keyPattern);
+    if (!keyMatch || keyMatch.index === undefined) return null;
+
+    const valueStart = keyMatch.index + keyMatch[0].length;
+
+    // Find end boundary: next segment key or closing brace
+    let valueEnd = -1;
+    const nextKey = SEGMENTS[i + 1];
+    if (nextKey) {
+      // Look for ",\s*\n\s*"nextKey" pattern (the comma + next key)
+      const endPattern = new RegExp(`",\\s*\\n\\s*"${nextKey}"\\s*:`);
+      const endMatch = raw.slice(valueStart).match(endPattern);
+      if (!endMatch || endMatch.index === undefined) return null;
+      valueEnd = valueStart + endMatch.index;
+    } else {
+      // Last key: find closing "\n} (possibly with trailing whitespace/backticks)
+      const endMatch = raw.slice(valueStart).match(/"\s*\n\s*\}/);
+      if (!endMatch || endMatch.index === undefined) return null;
+      valueEnd = valueStart + endMatch.index;
+    }
+
+    const value = raw.slice(valueStart, valueEnd)
+      .replace(/\n/g, "")        // remove literal newlines
+      .replace(/\\n/g, "\n");    // convert escaped \n to real newlines
+    result[key] = value;
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Process one passage → 4 segments
 // ---------------------------------------------------------------------------
 async function processPassage(
@@ -134,25 +193,14 @@ async function processPassage(
 
   const raw = await callClaude(prompt, SYSTEM_PROMPT);
 
-  let parsed: Record<string, string>;
-  try {
-    const stripped = raw.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
-    parsed = JSON.parse(stripped);
-  } catch {
-    const objMatch = raw.match(/\{[\s\S]*\}/);
-    if (!objMatch) {
-      log(`  ✗ No JSON for ${passage.reference}`);
-      return null;
-    }
-    try {
-      parsed = JSON.parse(objMatch[0]);
-    } catch {
-      log(`  ✗ Parse failed for ${passage.reference}`);
-      return null;
-    }
+  const parsed = extractSegments(raw);
+  if (!parsed) {
+    log(`  ✗ Extract failed for ${passage.reference}`);
+    log(`  Raw (first 300): ${raw.slice(0, 300).replace(/\n/g, "\\n")}`);
+    return null;
   }
 
-  // Validate all 4 segments present
+  // Validate all 4 segments present and non-trivial
   for (const seg of SEGMENTS) {
     if (typeof parsed[seg] !== "string" || parsed[seg].length < 50) {
       log(`  ✗ Missing/short segment "${seg}" for ${passage.reference}`);

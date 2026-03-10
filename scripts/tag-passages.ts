@@ -20,7 +20,7 @@ import { TAG_TAXONOMY_PROMPT, ALL_TAGS } from "../src/constants/mood-tags.js";
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-const BATCH_TARGET_VERSES = 100; // target verses per CLI call
+const BATCH_TARGET_VERSES = parseInt(process.env.BATCH_SIZE ?? "100", 10); // target verses per CLI call
 const MAX_CHAPTER_FOR_BATCH = 60; // chapters with more verses go solo
 
 // ---------------------------------------------------------------------------
@@ -33,7 +33,6 @@ const logStream = fs.createWriteStream(LOG_FILE, { flags: "a" });
 
 function log(msg: string) {
   const line = `[${new Date().toISOString()}] ${msg}`;
-  console.log(line);
   logStream.write(line + "\n");
 }
 
