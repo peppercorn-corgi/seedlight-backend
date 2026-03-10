@@ -76,7 +76,7 @@ model Feedback {
 }
 
 model ScriptureIndex {
-  id         String   @id @default(cuid())
+  id         String @id @default(cuid())
   book       String // e.g. "Philippians"
   bookZh     String // e.g. "腓立比书"
   chapter    Int
@@ -84,13 +84,47 @@ model ScriptureIndex {
   verseEnd   Int?
   textZh     String // CUV text
   textEn     String // WEB text
-  themes     String[] // ["anxiety", "trust", "provision"]
-  moodTags   String[] // ["anxious", "worried", "stressed"]
-  importance Int      @default(0) // 0-10, for prioritization
 
-  @@index([moodTags])
-  @@index([themes])
   @@map("scripture_index")
+}
+
+model DevotionalPassage {
+  id         String   @id @default(cuid())
+  book       String // English book name
+  bookZh     String // Chinese book name
+  chapter    Int
+  verseStart Int
+  verseEnd   Int? // null if single verse
+  reference  String // e.g., "腓立比书 4:6-7"
+  textZh     String // Combined CUV text
+  textEn     String // Combined WEB text
+  moodTags   String[] // fine-grained emotion/situation/theme tags
+  themes     String[] // spiritual themes
+  importance Int      @default(5) // 1-10
+
+  exegeses PreGeneratedExegesis[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([book, chapter, verseStart])
+  @@index([moodTags])
+  @@index([importance])
+  @@map("devotional_passages")
+}
+
+model PreGeneratedExegesis {
+  id        String            @id @default(cuid())
+  passageId String
+  passage   DevotionalPassage @relation(fields: [passageId], references: [id])
+  segment   String // seeker | new_believer | growing | mature
+  exegesis  String // Pre-generated exegesis text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([passageId, segment])
+  @@map("pre_generated_exegeses")
 }
 
 model PushLog {

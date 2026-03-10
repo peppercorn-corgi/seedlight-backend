@@ -1,14 +1,5 @@
 import { prisma } from "../lib/db.js";
 
-export async function findByMoodTags(tags: string[]) {
-  return prisma.scriptureIndex.findMany({
-    where: {
-      moodTags: { hasSome: tags },
-    },
-    orderBy: { importance: "desc" },
-  });
-}
-
 export async function findByReference(ref: string) {
   // Parse reference like "Philippians 4:6-7" or "诗篇 23:1"
   const match = ref.match(/^(.+?)\s+(\d+):(\d+)(?:-(\d+))?$/);
@@ -38,21 +29,6 @@ export async function findByReference(ref: string) {
     textZh: verses.map((v) => v.textZh).join(""),
     textEn: verses.map((v) => v.textEn).join(" "),
   };
-}
-
-export async function verifyReference(
-  book: string,
-  chapter: number,
-  verseStart: number,
-) {
-  const record = await prisma.scriptureIndex.findFirst({
-    where: {
-      OR: [{ book }, { bookZh: book }],
-      chapter,
-      verseStart,
-    },
-  });
-  return record !== null;
 }
 
 export async function getRecentlyUsed(userId: string, limit: number) {

@@ -1,30 +1,169 @@
 import { getLlmProvider } from "./llm/index.js";
-import { findByMoodTags, findByReference, getRecentlyUsed } from "./scripture.js";
+import { findByReference, getRecentlyUsed } from "./scripture.js";
+import {
+  expandMoodTags,
+  selectPassage,
+  getPreGeneratedExegesis,
+  getRecentlyUsedRefs,
+} from "./passage.js";
 import { prisma } from "../lib/db.js";
 
-function buildSystemPrompt(segment: string): string {
-  const toneGuide: Record<string, string> = {
-    seeker: `对方是一位尚未信主的慕道友。
+// ---------------------------------------------------------------------------
+// Tone guides (shared between optimized and legacy flows)
+// ---------------------------------------------------------------------------
+const TONE_GUIDE: Record<string, string> = {
+  seeker: `对方是一位尚未信主的慕道友。
 - 用通俗易懂的语言，避免教会术语（如"称义"、"成圣"等需要解释后才能使用）
 - 从生活经验和普世价值出发，搭建通往圣经真理的桥梁
 - 不要假设对方了解任何基督教概念`,
-    new_believer: `对方是一位初信者。
+  new_believer: `对方是一位初信者。
 - 用鼓励和引导的语气
 - 可以逐步引入信仰概念，但要简明解释
 - 帮助建立信仰根基，指向圣经原则`,
-    growing: `对方是一位信仰正在成长中的基督徒。
+  growing: `对方是一位信仰正在成长中的基督徒。
 - 适度引入神学背景知识和属灵操练的概念
 - 可以提及原文含义（希腊文/希伯来文）但需附上通俗解释
 - 鼓励建立规律的灵修习惯，引导更深地认识神的属性
 - 帮助将信仰融入日常生活的各个层面`,
-    mature: `对方是一位成熟的基督徒。
+  mature: `对方是一位成熟的基督徒。
 - 可以使用神学术语和较深的释经
 - 提供更深层的属灵洞见和反思
 - 适当引用希腊文/希伯来文原文帮助理解经文深层含义
 - 鼓励更深的委身和服事`,
-  };
+};
 
-  const tone = toneGuide[segment] || toneGuide.seeker;
+// =========================================================================
+// Optimized flow: pre-generated exegesis + real-time secularLink & covenant
+// =========================================================================
+
+function buildOptimizedSystemPrompt(segment: string): string {
+  const tone = TONE_GUIDE[segment] || TONE_GUIDE.seeker;
+
+  return `你是一位温柔、有智慧的牧者。你持守基督教基要派（Protestant fundamentalist）的神学立场，但说话方式温和、不居高临下。
+
+语气要求：
+- 像一位关怀的牧者在安静地与人谈心，不是在讲台上讲道
+- 不要用"朋友"、"亲爱的"等称呼开头，直接进入内容
+- 语言温暖但不煽情，真诚但不说教
+
+${tone}
+
+你将收到一段经文和已有的释经内容。请根据用户的情绪，生成以下两部分内容：
+
+**文化连结 (secularLink)**：
+- 将经文的智慧与中华文化、日常生活实际联系起来
+- 可以引用中国古典智慧、俗语、或现代生活中人人能共鸣的场景
+- 让人感到这不是外来的宗教说教，而是与自身文化相通的智慧
+
+**圣约 (covenant)**：
+- 温和地指出神的邀请和人可以做出的回应
+- 诚实地说明忽略这份邀请可能错过什么（不是恐吓，而是真诚地分享）
+- 给出一个具体的、可操作的回应行动建议
+
+以JSON格式返回：{"secularLink":"...","covenant":"..."}
+只返回JSON，不要包含markdown代码块标记。`;
+}
+
+function buildOptimizedUserPrompt(
+  moodType: string,
+  moodText: string | undefined,
+  scriptureRef: string,
+  scriptureZh: string,
+  exegesis: string,
+): string {
+  let prompt = `用户情绪: ${moodType}`;
+  if (moodText) prompt += `\n用户描述: ${moodText}`;
+  prompt += `\n\n经文: ${scriptureRef}\n${scriptureZh}`;
+  prompt += `\n\n释经:\n${exegesis}`;
+  prompt += `\n\n请生成文化连结和圣约内容。`;
+  return prompt;
+}
+
+interface PartialAiResponse {
+  secularLink: string;
+  covenant: string;
+}
+
+function parsePartialResponse(text: string): PartialAiResponse {
+  const cleaned = text.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("No JSON object in response");
+    parsed = JSON.parse(match[0]);
+  }
+
+  for (const key of ["secularLink", "covenant"] as const) {
+    if (typeof parsed[key] !== "string" || parsed[key].trim() === "") {
+      throw new Error(`Missing field: ${key}`);
+    }
+  }
+  return parsed as PartialAiResponse;
+}
+
+// ---------------------------------------------------------------------------
+// Optimized flow: select passage → use pre-gen exegesis → generate rest
+// ---------------------------------------------------------------------------
+async function generateOptimized(
+  userId: string,
+  segment: string,
+  moodType: string,
+  moodText?: string,
+) {
+  // 1. Expand mood to fine-grained tags
+  const tags = expandMoodTags(moodType);
+
+  // 2. Get recently used refs
+  const recentRefs = await getRecentlyUsedRefs(userId, 10);
+
+  // 3. Select passage
+  const passage = await selectPassage(tags, recentRefs);
+  if (!passage) return null; // no passages found, fallback needed
+
+  // 4. Fetch pre-generated exegesis
+  const exegesis = await getPreGeneratedExegesis(passage.id, segment);
+  if (!exegesis) return null; // no pre-gen available, fallback needed
+
+  // 5. Call LLM for secularLink + covenant only
+  const provider = getLlmProvider();
+  const systemPrompt = buildOptimizedSystemPrompt(segment);
+  const userPrompt = buildOptimizedUserPrompt(
+    moodType, moodText,
+    passage.reference, passage.textZh, exegesis,
+  );
+
+  console.log(`[LLM:opt] Generating secularLink+covenant for "${passage.reference}", mood="${moodType}"`);
+  const startTime = Date.now();
+  const response = await provider.generate({
+    system: systemPrompt,
+    user: userPrompt,
+    maxTokens: 2000,
+  });
+  console.log(`[LLM:opt] Done in ${((Date.now() - startTime) / 1000).toFixed(1)}s, model=${response.model}`);
+
+  // 6. Parse response
+  const partial = parsePartialResponse(response.text);
+
+  return {
+    scriptureRef: passage.reference,
+    scriptureZh: passage.textZh,
+    scriptureEn: passage.textEn,
+    exegesis,
+    secularLink: partial.secularLink,
+    covenant: partial.covenant,
+    verified: true, // passages come from our DB
+    aiModel: response.model,
+  };
+}
+
+// =========================================================================
+// Legacy flow: full LLM generation (fallback)
+// =========================================================================
+
+function buildLegacySystemPrompt(segment: string): string {
+  const tone = TONE_GUIDE[segment] || TONE_GUIDE.seeker;
 
   return `你是一位温柔、有智慧的牧者。你持守基督教基要派（Protestant fundamentalist）的神学立场，但说话方式温和、不居高临下。
 
@@ -63,7 +202,7 @@ ${tone}
 只返回JSON，不要包含markdown代码块标记或其他内容。`;
 }
 
-function buildUserPrompt(
+function buildLegacyUserPrompt(
   moodType: string,
   moodText: string | undefined,
   recentRefs: string[],
@@ -83,7 +222,7 @@ function buildUserPrompt(
   return prompt;
 }
 
-interface AiResponse {
+interface FullAiResponse {
   scriptureRef: string;
   scriptureZh: string;
   scriptureEn: string;
@@ -92,8 +231,7 @@ interface AiResponse {
   covenant: string;
 }
 
-function parseAiResponse(text: string): AiResponse {
-  // Strip possible markdown code fences
+function parseFullResponse(text: string): FullAiResponse {
   const cleaned = text.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
   const parsed = JSON.parse(cleaned);
 
@@ -103,50 +241,45 @@ function parseAiResponse(text: string): AiResponse {
       throw new Error(`AI response missing or empty field: ${key}`);
     }
   }
-  return parsed as AiResponse;
+  return parsed as FullAiResponse;
 }
 
-export async function generateContent(
+async function generateLegacy(
   userId: string,
+  segment: string,
   moodType: string,
   moodText?: string,
 ) {
-  // 1. Get user segment
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  // Use expanded tags to find candidates from DevotionalPassage first
+  const tags = expandMoodTags(moodType);
+  const passages = await prisma.devotionalPassage.findMany({
+    where: { moodTags: { hasSome: tags } },
+    orderBy: { importance: "desc" },
+    take: 5,
+    select: { reference: true, textZh: true },
+  });
+  const candidateDescs = passages.map((p) => `${p.reference} - ${p.textZh.slice(0, 80)}`);
 
-  // 2. Find candidate scriptures by mood tags
-  const candidates = await findByMoodTags([moodType]);
-  const candidateDescs = candidates
-    .slice(0, 5)
-    .map((s) => `${s.bookZh} ${s.chapter}:${s.verseStart}${s.verseEnd ? `-${s.verseEnd}` : ""} - ${s.textZh}`);
-
-  // 3. Get recently used refs to avoid repeats
   const recentRefs = await getRecentlyUsed(userId, 10);
+  const systemPrompt = buildLegacySystemPrompt(segment);
+  const userPrompt = buildLegacyUserPrompt(moodType, moodText, recentRefs, candidateDescs);
 
-  // 4. Build prompts
-  const systemPrompt = buildSystemPrompt(user.segment);
-  const userPrompt = buildUserPrompt(moodType, moodText, recentRefs, candidateDescs);
-
-  // 5. Call LLM
   const provider = getLlmProvider();
-  console.log(`[LLM] Generating content for mood="${moodType}", user=${userId}`);
+  console.log(`[LLM:legacy] Full generation for mood="${moodType}", user=${userId}`);
   const startTime = Date.now();
   const response = await provider.generate({
     system: systemPrompt,
     user: userPrompt,
     maxTokens: 4000,
   });
-  console.log(`[LLM] Response received in ${((Date.now() - startTime) / 1000).toFixed(1)}s, model=${response.model}`);
+  console.log(`[LLM:legacy] Done in ${((Date.now() - startTime) / 1000).toFixed(1)}s, model=${response.model}`);
 
-  // 6. Parse structured response
-  console.log("[LLM] Raw response:\n" + response.text);
-  const aiResult = parseAiResponse(response.text);
+  console.log("[LLM:legacy] Raw:\n" + response.text);
+  const aiResult = parseFullResponse(response.text);
 
-  // 7. Verify scripture reference exists in DB
+  // Verify scripture reference in DB
   const dbScripture = await findByReference(aiResult.scriptureRef);
   const verified = dbScripture !== null;
-
-  // If found in DB, prefer the DB text for accuracy
   if (dbScripture) {
     aiResult.scriptureZh = dbScripture.textZh;
     aiResult.scriptureEn = dbScripture.textEn;
@@ -156,6 +289,33 @@ export async function generateContent(
     ...aiResult,
     verified,
     aiModel: response.model,
-    language: user.language,
   };
+}
+
+// =========================================================================
+// Public API — tries optimized flow first, falls back to legacy
+// =========================================================================
+
+export async function generateContent(
+  userId: string,
+  moodType: string,
+  moodText?: string,
+) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+
+  // Try optimized flow (pre-generated exegesis + partial LLM)
+  try {
+    const result = await generateOptimized(userId, user.segment, moodType, moodText);
+    if (result) {
+      console.log(`[content] Optimized flow succeeded for ${userId}`);
+      return { ...result, language: user.language };
+    }
+    console.log(`[content] Optimized flow: no passage/exegesis found, falling back`);
+  } catch (err) {
+    console.error(`[content] Optimized flow error, falling back:`, (err as Error).message);
+  }
+
+  // Fallback to legacy full generation
+  const result = await generateLegacy(userId, user.segment, moodType, moodText);
+  return { ...result, language: user.language };
 }
