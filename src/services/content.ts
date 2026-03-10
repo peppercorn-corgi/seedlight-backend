@@ -2,6 +2,7 @@ import { getLlmProvider } from "./llm/index.js";
 import { findByReference, getRecentlyUsed } from "./scripture.js";
 import {
   expandMoodTags,
+  extractTagsFromText,
   selectPassage,
   getPreGeneratedExegesis,
   getRecentlyUsedRefs,
@@ -36,8 +37,20 @@ const TONE_GUIDE: Record<string, string> = {
 // Optimized flow: pre-generated exegesis + real-time secularLink & covenant
 // =========================================================================
 
-function buildOptimizedSystemPrompt(segment: string): string {
+function buildOptimizedSystemPrompt(segment: string, hasMoodText: boolean): string {
   const tone = TONE_GUIDE[segment] || TONE_GUIDE.seeker;
+
+  const personalLinkSection = hasMoodText ? `
+**个人连结 (personalLink)**：
+- 根据用户的具体描述，用1-2段话将经文的释经内容和用户的实际处境联系起来
+- 让用户感受到这段经文是"对我说的"，而不只是通用的解读
+- 自然衔接已有的释经，像牧者听完倾诉后的回应
+
+` : "";
+
+  const jsonFormat = hasMoodText
+    ? `{"personalLink":"...","secularLink":"...","covenant":"..."}`
+    : `{"secularLink":"...","covenant":"..."}`;
 
   return `你是一位温柔、有智慧的牧者。你持守基督教基要派（Protestant fundamentalist）的神学立场，但说话方式温和、不居高临下。
 
@@ -48,8 +61,8 @@ function buildOptimizedSystemPrompt(segment: string): string {
 
 ${tone}
 
-你将收到一段经文和已有的释经内容。请根据用户的情绪，生成以下两部分内容：
-
+你将收到一段经文和已有的释经内容。请根据用户的情绪，生成以下内容：
+${personalLinkSection}
 **文化连结 (secularLink)**：
 - 将经文的智慧与中华文化、日常生活实际联系起来
 - 可以引用中国古典智慧、俗语、或现代生活中人人能共鸣的场景
@@ -60,7 +73,9 @@ ${tone}
 - 诚实地说明忽略这份邀请可能错过什么（不是恐吓，而是真诚地分享）
 - 给出一个具体的、可操作的回应行动建议
 
-以JSON格式返回：{"secularLink":"...","covenant":"..."}
+格式要求：每部分内容分2-3个自然段落，段落之间用\\n\\n分隔。不要写成一大段。
+
+以JSON格式返回：${jsonFormat}
 只返回JSON，不要包含markdown代码块标记。`;
 }
 
@@ -75,60 +90,81 @@ function buildOptimizedUserPrompt(
   if (moodText) prompt += `\n用户描述: ${moodText}`;
   prompt += `\n\n经文: ${scriptureRef}\n${scriptureZh}`;
   prompt += `\n\n释经:\n${exegesis}`;
-  prompt += `\n\n请生成文化连结和圣约内容。`;
+  if (moodText) {
+    prompt += `\n\n请根据用户的描述生成个人连结、文化连结和圣约内容。`;
+  } else {
+    prompt += `\n\n请生成文化连结和圣约内容。`;
+  }
   return prompt;
 }
 
 interface PartialAiResponse {
+  personalLink?: string;
   secularLink: string;
   covenant: string;
 }
 
-function parsePartialResponse(text: string): PartialAiResponse {
+function parsePartialResponse(text: string, hasMoodText: boolean): PartialAiResponse {
   const cleaned = text.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
 
-  // Try JSON.parse first
-  try {
-    const parsed = JSON.parse(cleaned);
-    if (typeof parsed.secularLink === "string" && typeof parsed.covenant === "string") {
-      return parsed as PartialAiResponse;
-    }
-  } catch { /* fall through to key-boundary extraction */ }
+  const validate = (o: unknown): o is PartialAiResponse =>
+    !!o && typeof (o as Record<string, unknown>).secularLink === "string"
+        && typeof (o as Record<string, unknown>).covenant === "string";
 
-  // Key-boundary extraction (handles unescaped quotes in LLM output)
-  const keys = ["secularLink", "covenant"] as const;
-  const result: Record<string, string> = {};
+  // Strategy 1: direct JSON.parse
+  try { const p = JSON.parse(cleaned); if (validate(p)) return p; } catch { /* */ }
 
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    const keyPattern = new RegExp(`"${key}"\\s*:\\s*"`);
-    const keyMatch = cleaned.match(keyPattern);
-    if (!keyMatch || keyMatch.index === undefined) {
-      throw new Error(`Missing field: ${key}`);
-    }
-    const valueStart = keyMatch.index + keyMatch[0].length;
+  // Strategy 2: fix literal newlines then JSON.parse
+  try { const p = JSON.parse(cleaned.replace(/\n/g, "\\n")); if (validate(p)) return p; } catch { /* */ }
 
-    let valueEnd: number;
-    const nextKey = keys[i + 1];
-    if (nextKey) {
-      const endPattern = new RegExp(`",?\\s*"${nextKey}"\\s*:`);
-      const endMatch = cleaned.slice(valueStart).match(endPattern);
-      if (!endMatch || endMatch.index === undefined) {
-        throw new Error(`Cannot find boundary for ${key}`);
-      }
-      valueEnd = valueStart + endMatch.index;
-    } else {
-      const endMatch = cleaned.slice(valueStart).match(/"\s*\}/);
-      if (!endMatch || endMatch.index === undefined) {
-        throw new Error(`Cannot find end of ${key}`);
-      }
-      valueEnd = valueStart + endMatch.index;
-    }
+  // Strategy 3: order-independent key-boundary extraction
+  const keys = hasMoodText
+    ? ["personalLink", "secularLink", "covenant"] as const
+    : ["secularLink", "covenant"] as const;
+  return extractKeyValues(cleaned, keys) as PartialAiResponse;
+}
 
-    result[key] = cleaned.slice(valueStart, valueEnd).replace(/\n/g, "");
+/**
+ * Order-independent key-boundary extraction.
+ * Handles LLM output with keys in any order and unescaped quotes in values.
+ */
+function extractKeyValues<K extends string>(cleaned: string, keys: readonly K[]): Record<K, string> {
+  // Find all key positions (order-independent)
+  const found: Array<{ key: K; patternStart: number; valueStart: number }> = [];
+  for (const key of keys) {
+    const m = cleaned.match(new RegExp(`"${key}"\\s*:\\s*"`));
+    if (!m || m.index === undefined) throw new Error(`Missing field: ${key}`);
+    found.push({ key, patternStart: m.index, valueStart: m.index + m[0].length });
   }
+  found.sort((a, b) => a.patternStart - b.patternStart);
 
-  return result as unknown as PartialAiResponse;
+  const result = {} as Record<K, string>;
+  for (let i = 0; i < found.length; i++) {
+    const { key, valueStart } = found[i];
+    let valueEnd: number;
+
+    if (i + 1 < found.length) {
+      // Value ends at the last `"` before the next key's pattern
+      const segment = cleaned.slice(valueStart, found[i + 1].patternStart);
+      const lastQ = segment.lastIndexOf('"');
+      if (lastQ < 0) throw new Error(`Cannot find end of ${key}`);
+      valueEnd = valueStart + lastQ;
+    } else {
+      // Last key: find closing `"` before `}`
+      const tail = cleaned.slice(valueStart);
+      const m = tail.match(/"[\s]*\}[\s]*$/);
+      if (m && m.index !== undefined) {
+        valueEnd = valueStart + m.index;
+      } else {
+        // Truncated response: take everything, trim trailing incomplete chars
+        console.warn(`[parse] Last field "${key}" appears truncated, using available text`);
+        valueEnd = cleaned.length;
+      }
+    }
+
+    result[key] = cleaned.slice(valueStart, valueEnd);
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,15 +174,13 @@ async function generateOptimized(
   userId: string,
   segment: string,
   moodType: string,
+  tags: string[],
   moodText?: string,
 ) {
-  // 1. Expand mood to fine-grained tags
-  const tags = expandMoodTags(moodType);
-
-  // 2. Get recently used refs
+  // 1. Get recently used refs
   const recentRefs = await getRecentlyUsedRefs(userId, 10);
 
-  // 3. Select passage
+  // 2. Select passage using pre-computed tags
   const passage = await selectPassage(tags, recentRefs);
   if (!passage) return null; // no passages found, fallback needed
 
@@ -154,31 +188,39 @@ async function generateOptimized(
   const exegesis = await getPreGeneratedExegesis(passage.id, segment);
   if (!exegesis) return null; // no pre-gen available, fallback needed
 
-  // 5. Call LLM for secularLink + covenant only
+  // 5. Call LLM for personalLink (if moodText) + secularLink + covenant
+  const hasMoodText = !!moodText;
   const provider = getLlmProvider();
-  const systemPrompt = buildOptimizedSystemPrompt(segment);
+  const systemPrompt = buildOptimizedSystemPrompt(segment, hasMoodText);
   const userPrompt = buildOptimizedUserPrompt(
     moodType, moodText,
     passage.reference, passage.textZh, exegesis,
   );
 
-  console.log(`[LLM:opt] Generating secularLink+covenant for "${passage.reference}", mood="${moodType}"`);
+  const fields = hasMoodText ? "personalLink+secularLink+covenant" : "secularLink+covenant";
+  console.log(`[LLM:opt] Generating ${fields} for "${passage.reference}", mood="${moodType}"`);
   const startTime = Date.now();
   const response = await provider.generate({
     system: systemPrompt,
     user: userPrompt,
-    maxTokens: 2000,
+    maxTokens: 8000,
   });
   console.log(`[LLM:opt] Done in ${((Date.now() - startTime) / 1000).toFixed(1)}s, model=${response.model}`);
+  console.log(`[LLM:opt] Raw:\n${response.text}`);
 
   // 6. Parse response
-  const partial = parsePartialResponse(response.text);
+  const partial = parsePartialResponse(response.text, hasMoodText);
+
+  // Append personalLink to pre-generated exegesis when available
+  const finalExegesis = partial.personalLink
+    ? `${exegesis}\n\n${partial.personalLink}`
+    : exegesis;
 
   return {
     scriptureRef: passage.reference,
     scriptureZh: passage.textZh,
     scriptureEn: passage.textEn,
-    exegesis,
+    exegesis: finalExegesis,
     secularLink: partial.secularLink,
     covenant: partial.covenant,
     verified: true, // passages come from our DB
@@ -218,6 +260,8 @@ ${tone}
 - 温和地指出神的邀请和人可以做出的回应
 - 诚实地说明忽略这份邀请可能错过什么（不是恐吓，而是真诚地分享）
 - 给出一个具体的、可操作的回应行动建议
+
+格式要求：每部分内容（exegesis、secularLink、covenant）都要分2-3个自然段落，段落之间用\\n\\n分隔。不要写成一大段。
 
 你必须以JSON格式返回，包含以下字段：
 - scriptureRef: 经文引用，格式如 "腓立比书 4:6-7"（使用中文书卷名）
@@ -261,59 +305,30 @@ interface FullAiResponse {
 
 function parseFullResponse(text: string): FullAiResponse {
   const cleaned = text.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
+  const required = ["scriptureRef", "scriptureZh", "scriptureEn", "exegesis", "secularLink", "covenant"] as const;
 
-  // Try JSON.parse first
-  try {
-    const parsed = JSON.parse(cleaned);
-    const required = ["scriptureRef", "scriptureZh", "scriptureEn", "exegesis", "secularLink", "covenant"] as const;
-    const allPresent = required.every((k) => typeof parsed[k] === "string" && parsed[k].trim() !== "");
-    if (allPresent) return parsed as FullAiResponse;
-  } catch { /* fall through to key-boundary extraction */ }
+  const validate = (o: unknown): o is FullAiResponse =>
+    !!o && required.every((k) => typeof (o as Record<string, unknown>)[k] === "string"
+      && ((o as Record<string, unknown>)[k] as string).trim() !== "");
 
-  // Key-boundary extraction
-  const keys = ["scriptureRef", "scriptureZh", "scriptureEn", "exegesis", "secularLink", "covenant"] as const;
-  const result: Record<string, string> = {};
+  // Strategy 1: direct JSON.parse
+  try { const p = JSON.parse(cleaned); if (validate(p)) return p; } catch { /* */ }
 
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    const keyPattern = new RegExp(`"${key}"\\s*:\\s*"`);
-    const keyMatch = cleaned.match(keyPattern);
-    if (!keyMatch || keyMatch.index === undefined) {
-      throw new Error(`AI response missing field: ${key}`);
-    }
-    const valueStart = keyMatch.index + keyMatch[0].length;
+  // Strategy 2: fix literal newlines then JSON.parse
+  try { const p = JSON.parse(cleaned.replace(/\n/g, "\\n")); if (validate(p)) return p; } catch { /* */ }
 
-    let valueEnd: number;
-    const nextKey = keys[i + 1];
-    if (nextKey) {
-      const endPattern = new RegExp(`",?\\s*"${nextKey}"\\s*:`);
-      const endMatch = cleaned.slice(valueStart).match(endPattern);
-      if (!endMatch || endMatch.index === undefined) {
-        throw new Error(`Cannot find boundary for ${key}`);
-      }
-      valueEnd = valueStart + endMatch.index;
-    } else {
-      const endMatch = cleaned.slice(valueStart).match(/"\s*\}/);
-      if (!endMatch || endMatch.index === undefined) {
-        throw new Error(`Cannot find end of ${key}`);
-      }
-      valueEnd = valueStart + endMatch.index;
-    }
-
-    result[key] = cleaned.slice(valueStart, valueEnd).replace(/\n/g, "");
-  }
-
-  return result as unknown as FullAiResponse;
+  // Strategy 3: order-independent key-boundary extraction
+  return extractKeyValues(cleaned, required) as FullAiResponse;
 }
 
 async function generateLegacy(
   userId: string,
   segment: string,
   moodType: string,
+  tags: string[],
   moodText?: string,
 ) {
-  // Use expanded tags to find candidates from DevotionalPassage first
-  const tags = expandMoodTags(moodType);
+  // Use pre-computed tags to find candidates from DevotionalPassage
   const passages = await prisma.devotionalPassage.findMany({
     where: { moodTags: { hasSome: tags } },
     orderBy: { importance: "desc" },
@@ -365,9 +380,27 @@ export async function generateContent(
 ) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
+  // Build tags: if moodText provided, extract focused tags; otherwise expand from moodType
+  const moodTags = expandMoodTags(moodType);
+  let tags = moodTags;
+  if (moodText) {
+    try {
+      const extracted = await extractTagsFromText(moodText);
+      if (extracted.length > 0) {
+        // Use extracted tags only — more focused than the broad moodType expansion
+        tags = extracted;
+        console.log(`[content] Using extracted tags (${tags.length}): [${tags.join(",")}]`);
+      } else {
+        console.log(`[content] No tags extracted, falling back to moodType tags (${moodTags.length})`);
+      }
+    } catch (err) {
+      console.error(`[content] Tag extraction failed, using moodType tags:`, (err as Error).message);
+    }
+  }
+
   // Try optimized flow (pre-generated exegesis + partial LLM)
   try {
-    const result = await generateOptimized(userId, user.segment, moodType, moodText);
+    const result = await generateOptimized(userId, user.segment, moodType, tags, moodText);
     if (result) {
       console.log(`[content] Optimized flow succeeded for ${userId}`);
       return { ...result, language: user.language };
@@ -378,6 +411,6 @@ export async function generateContent(
   }
 
   // Fallback to legacy full generation
-  const result = await generateLegacy(userId, user.segment, moodType, moodText);
+  const result = await generateLegacy(userId, user.segment, moodType, tags, moodText);
   return { ...result, language: user.language };
 }

@@ -18,10 +18,14 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
       return;
     }
 
-    const stillGenerating = isAudioGenerating(contentCardId);
+    if (isAudioGenerating(contentCardId)) {
+      res.status(202).json({ status: "generating" });
+      return;
+    }
+
     const filePath = getAudioFilePath(contentCardId);
 
-    if (!filePath && !stillGenerating) {
+    if (!filePath) {
       // Trigger on-demand generation
       generateAudio(contentCardId).catch((err) =>
         console.error(`[audio] On-demand generation failed for ${contentCardId}:`, err),
@@ -30,18 +34,9 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
       return;
     }
 
-    if (!filePath) {
-      // Generating but no file yet (first chunk not written)
-      res.status(202).json({ status: "generating" });
-      return;
-    }
-
-    // File exists — serve it (may be partial if still generating)
+    // Serve complete audio file
     const stat = fs.statSync(filePath);
     const range = req.headers.range;
-
-    // Custom header tells frontend whether more audio chunks are coming
-    const extraHeaders = stillGenerating ? { "X-Audio-Partial": "true" } : {};
 
     if (range) {
       const parts = range.replace(/bytes=/, "").split("-");
@@ -54,7 +49,6 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
         "Accept-Ranges": "bytes",
         "Content-Length": chunkSize,
         "Content-Type": "audio/mpeg",
-        ...extraHeaders,
       });
       fs.createReadStream(filePath, { start, end }).pipe(res);
     } else {
@@ -62,7 +56,6 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
         "Content-Length": stat.size,
         "Content-Type": "audio/mpeg",
         "Accept-Ranges": "bytes",
-        ...extraHeaders,
       });
       fs.createReadStream(filePath).pipe(res);
     }

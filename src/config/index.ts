@@ -12,6 +12,7 @@ const envSchema = z.object({
   LLM_MODEL: z.string().optional(),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
   GOOGLE_TTS_CREDENTIALS: z.string().optional(),
+  TAG_EXTRACTION_MODEL: z.string().default("gemini-2.5-flash-lite"),
   CORS_ORIGIN: z.string().default("http://localhost:3003"),
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z
