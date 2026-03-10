@@ -38,6 +38,13 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
     const stat = fs.statSync(filePath);
     const range = req.headers.range;
 
+    // Audio content is immutable once generated — cache aggressively
+    const cacheHeaders = {
+      "Content-Type": "audio/mpeg",
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "public, max-age=31536000, immutable",
+    };
+
     if (range) {
       const parts = range.replace(/bytes=/, "").split("-");
       const start = parseInt(parts[0], 10);
@@ -45,17 +52,15 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
       const chunkSize = end - start + 1;
 
       res.writeHead(206, {
+        ...cacheHeaders,
         "Content-Range": `bytes ${start}-${end}/${stat.size}`,
-        "Accept-Ranges": "bytes",
         "Content-Length": chunkSize,
-        "Content-Type": "audio/mpeg",
       });
       fs.createReadStream(filePath, { start, end }).pipe(res);
     } else {
       res.writeHead(200, {
+        ...cacheHeaders,
         "Content-Length": stat.size,
-        "Content-Type": "audio/mpeg",
-        "Accept-Ranges": "bytes",
       });
       fs.createReadStream(filePath).pipe(res);
     }
