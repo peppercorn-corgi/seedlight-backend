@@ -19,6 +19,7 @@ router.get("/shared/:id", async (req, res, next) => {
         exegesis: true,
         secularLink: true,
         covenant: true,
+        language: true,
         verified: true,
         createdAt: true,
       },

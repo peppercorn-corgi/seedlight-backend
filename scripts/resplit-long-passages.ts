@@ -215,6 +215,26 @@ async function processPassage(
     });
 
   if (cleaned.length === 0) {
+    // Fallback: Claude returned the passage without splitting (e.g. 7-verse narrative).
+    // Mechanically split into ≤MAX_SPAN chunks, reuse tags from Claude's response.
+    if (parsed.length > 0) {
+      const srcTags = (parsed[0].moodTags || []).filter((t: string) => validTags.has(t));
+      const srcThemes = (parsed[0].themes || []).filter((t: string) => validTags.has(t));
+      const imp = Math.max(1, Math.min(10, Math.round(parsed[0].importance || 5)));
+      const fallbackTags = srcTags.length > 0 ? srcTags : ["hopeful", "peaceful", "faith"];
+      const fallbackThemes = srcThemes.length > 0 ? srcThemes : ["faith"];
+
+      const allNums = verses.map((v) => v.verseStart);
+      const mid = Math.ceil(allNums.length / 2);
+      cleaned.push(
+        { verseStart: allNums[0], verseEnd: allNums[mid - 1], moodTags: fallbackTags, themes: fallbackThemes, importance: imp },
+        { verseStart: allNums[mid], verseEnd: allNums[allNums.length - 1], moodTags: fallbackTags, themes: fallbackThemes, importance: imp },
+      );
+      log(`  ⚠ ${passage.reference}: force-split at midpoint (Claude did not split)`);
+    }
+  }
+
+  if (cleaned.length === 0) {
     log(`  ✗ No valid passages after cleaning for ${passage.reference}`);
     return null;
   }
