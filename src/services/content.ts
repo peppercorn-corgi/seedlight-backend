@@ -10,6 +10,45 @@ import {
 import { prisma } from "../lib/db.js";
 
 // ---------------------------------------------------------------------------
+// Mood daily-life context — helps the LLM understand the user's real situation
+// ---------------------------------------------------------------------------
+const MOOD_CONTEXT_ZH: Record<string, string> = {
+  anxious: "焦虑——可能来自工作压力、未来的不确定性、等待结果的煎熬、或对某件事的担忧",
+  sad: "难过——可能因为失去、失望、被误解、一段关系的变化、或一种说不清的低落感",
+  lonely: "孤独——可能是独处时的空虚感、在人群中的格格不入、想念某个人、或缺少被理解",
+  overwhelmed: "压力山大——事情太多喘不过气、工作生活失衡、不知道从哪里开始",
+  confused: "迷茫——面临重要选择、找不到人生方向、不知道该怎么做、质疑自己的决定",
+  exhausted: "疲惫——身心俱疲、感觉被掏空、想休息但停不下来、对很多事提不起劲",
+  angry: "愤怒——觉得不公平、被人伤害、对现状不满、或对自己的无能为力感到挫败",
+  grateful: "感恩——回想起值得感谢的人和事、感受到生活中的温暖和善意",
+  joyful: "喜乐——因为一件美好的事而开心、想要珍惜和分享这份快乐",
+  fearful: "恐惧——害怕失去重要的东西、害怕未知的将来、害怕自己不够好或承担不起",
+  guilty: "内疚——后悔做了某件事或没能做到某件事、觉得自己亏欠了谁、对自己感到失望",
+  hopeful: "盼望——虽然当下不完美，但心里有一种对未来的期待和向往",
+  peaceful: "平安——内心难得的安静，想要在这份平静中思考、沉淀、感受当下",
+  doubtful: "怀疑——对一些事情、信念、或自己的选择产生了质疑，不确定该相信什么",
+  grieving: "哀伤——正在经历失去或告别的痛苦，需要时间和空间来消化",
+};
+
+const MOOD_CONTEXT_EN: Record<string, string> = {
+  anxious: "Anxious — may stem from work pressure, uncertainty about the future, waiting for results, or worry about something specific",
+  sad: "Sad — perhaps due to loss, disappointment, feeling misunderstood, a changing relationship, or an unexplainable low feeling",
+  lonely: "Lonely — could be emptiness when alone, feeling out of place in a crowd, missing someone, or lacking genuine connection",
+  overwhelmed: "Overwhelmed — too much on their plate, struggling to balance work and life, unsure where to start",
+  confused: "Confused — facing a big decision, unsure of their direction, questioning past choices",
+  exhausted: "Exhausted — physically and emotionally drained, running on empty, wanting to rest but unable to stop",
+  angry: "Angry — sensing injustice, feeling hurt by others, frustrated with circumstances, or upset at their own helplessness",
+  grateful: "Grateful — reflecting on people and moments worth appreciating, sensing warmth and kindness in life",
+  joyful: "Joyful — happy about something wonderful, wanting to cherish and share the feeling",
+  fearful: "Fearful — afraid of losing something important, afraid of the unknown, afraid of not being enough",
+  guilty: "Guilty — regretting something done or left undone, feeling they have let someone down",
+  hopeful: "Hopeful — though things aren't perfect, they sense anticipation and longing for what's ahead",
+  peaceful: "Peaceful — experiencing rare inner quiet, wanting to reflect and be present in the moment",
+  doubtful: "Doubtful — questioning beliefs, choices, or certainties they once held",
+  grieving: "Grieving — processing loss or saying goodbye, needing space and time to heal",
+};
+
+// ---------------------------------------------------------------------------
 // Tone guides (shared between optimized and legacy flows)
 // ---------------------------------------------------------------------------
 const TONE_GUIDE: Record<string, string> = {
@@ -200,6 +239,12 @@ function buildOptimizedSystemPrompt(segment: string, hasMoodText: boolean): stri
 
 **必须使用简体中文，不得使用繁体字。**
 
+重要背景：用户在App上选择了自己当前的生活情绪（焦虑、难过、疲惫等）。这些情绪来自日常生活——工作、学习、人际关系、家庭、健康等，不一定与信仰有关。
+你的核心任务是：
+1. 先真正理解和共情用户的日常处境，让他们感到被听见
+2. 然后自然地将经文的智慧与他们的具体处境联系起来
+3. 以"陪伴者"而非"传道者"的姿态出现——不是给答案，而是一起看到亮光
+
 我们的用户群体包括：尚未信主的慕道友、刚接触信仰的初信者、正在成长中的基督徒、以及成熟的信徒。你需要根据当前用户的信仰阶段调整语言和深度。
 
 语气要求：
@@ -210,7 +255,7 @@ function buildOptimizedSystemPrompt(segment: string, hasMoodText: boolean): stri
 
 ${tone}
 
-你将收到一段经文和已有的释经内容。请根据用户的情绪，生成以下内容：
+你将收到一段经文、已有的释经内容、以及用户的生活情绪。请从用户的日常处境出发，生成以下内容：
 ${personalLinkSection}${secularLinkGuide}
 
 ${covenantGuide}
@@ -235,6 +280,12 @@ function buildOptimizedSystemPromptEn(segment: string, hasMoodText: boolean): st
 
   return `You are a gentle, wise pastor grounded in Protestant fundamentalist theology — affirming the authority of Scripture and the centrality of the Gospel. You speak warmly and without condescension.
 
+Important context: The user selected their current life emotion (anxious, sad, exhausted, etc.) in the app. These feelings come from everyday life — work, studies, relationships, family, health — and may have nothing to do with faith.
+Your core task:
+1. First genuinely understand and empathize with the user's daily situation — make them feel heard
+2. Then naturally bridge from their real-life experience to the scripture's wisdom
+3. Show up as a companion, not a preacher — don't hand out answers, walk alongside them toward the light
+
 Our users include: spiritually curious seekers, new believers, growing Christians, and mature believers. Adjust your language and depth to match the current user's faith stage.
 
 Tone requirements:
@@ -245,7 +296,7 @@ Tone requirements:
 
 ${tone}
 
-You will receive a scripture passage and its pre-written exegesis. Based on the user's emotional state, generate the following:
+You will receive a scripture passage, its pre-written exegesis, and the user's life emotion. Starting from the user's daily situation, generate the following:
 ${personalLinkSection}${secularLinkGuide}
 
 ${covenantGuide}
@@ -263,14 +314,15 @@ function buildOptimizedUserPrompt(
   scriptureZh: string,
   exegesis: string,
 ): string {
-  let prompt = `用户情绪: ${moodType}`;
-  if (moodText) prompt += `\n用户描述: ${moodText}`;
+  const moodDesc = MOOD_CONTEXT_ZH[moodType] || moodType;
+  let prompt = `用户当前的生活情绪: ${moodDesc}`;
+  if (moodText) prompt += `\n用户的具体描述: ${moodText}`;
   prompt += `\n\n经文: ${scriptureRef}\n${scriptureZh}`;
   prompt += `\n\n释经:\n${exegesis}`;
   if (moodText) {
-    prompt += `\n\n请根据用户的描述生成个人连结、文化连结和圣约内容。`;
+    prompt += `\n\n请从用户的日常处境出发，生成个人连结、文化连结和圣约内容。`;
   } else {
-    prompt += `\n\n请生成文化连结和圣约内容。`;
+    prompt += `\n\n请从用户的日常处境出发，生成文化连结和圣约内容。`;
   }
   return prompt;
 }
@@ -282,14 +334,15 @@ function buildOptimizedUserPromptEn(
   scriptureEn: string,
   exegesis: string,
 ): string {
-  let prompt = `User's mood: ${moodType}`;
-  if (moodText) prompt += `\nUser's description: ${moodText}`;
+  const moodDesc = MOOD_CONTEXT_EN[moodType] || moodType;
+  let prompt = `User's current life emotion: ${moodDesc}`;
+  if (moodText) prompt += `\nUser's own words: ${moodText}`;
   prompt += `\n\nScripture: ${scriptureRef}\n${scriptureEn}`;
   prompt += `\n\nExegesis:\n${exegesis}`;
   if (moodText) {
-    prompt += `\n\nPlease generate the personal connection, cultural connection, and covenant sections based on the user's description.`;
+    prompt += `\n\nStarting from the user's daily situation, generate the personal connection, cultural connection, and covenant sections.`;
   } else {
-    prompt += `\n\nPlease generate the cultural connection and covenant sections.`;
+    prompt += `\n\nStarting from the user's daily situation, generate the cultural connection and covenant sections.`;
   }
   return prompt;
 }
@@ -442,6 +495,12 @@ function buildLegacySystemPrompt(segment: string): string {
 
 **必须使用简体中文，不得使用繁体字。**
 
+重要背景：用户在App上选择了自己当前的生活情绪（焦虑、难过、疲惫等）。这些情绪来自日常生活——工作、学习、人际关系、家庭、健康等，不一定与信仰有关。
+你的核心任务是：
+1. 先真正理解和共情用户的日常处境，让他们感到被听见
+2. 然后自然地将经文的智慧与他们的具体处境联系起来
+3. 以"陪伴者"而非"传道者"的姿态出现——不是给答案，而是一起看到亮光
+
 我们的用户群体包括：尚未信主的慕道友、刚接触信仰的初信者、正在成长中的基督徒、以及成熟的信徒。你需要根据当前用户的信仰阶段调整语言和深度。
 
 语气要求：
@@ -452,7 +511,7 @@ function buildLegacySystemPrompt(segment: string): string {
 
 ${tone}
 
-根据用户的情绪，生成以下三部分内容：
+根据用户的生活情绪，从他们的日常处境出发，生成以下三部分内容：
 
 **释经 (exegesis)**（150-250字，一段话）：
 - 选择一段与用户情绪最贴合的圣经经文（和合本CUV），给出中文书卷名、章节、经节
@@ -482,6 +541,12 @@ function buildLegacySystemPromptEn(segment: string): string {
 
   return `You are a gentle, wise pastor grounded in Protestant fundamentalist theology — affirming the authority of Scripture and the centrality of the Gospel. You speak warmly and without condescension.
 
+Important context: The user selected their current life emotion (anxious, sad, exhausted, etc.) in the app. These feelings come from everyday life — work, studies, relationships, family, health — and may have nothing to do with faith.
+Your core task:
+1. First genuinely understand and empathize with the user's daily situation — make them feel heard
+2. Then naturally bridge from their real-life experience to the scripture's wisdom
+3. Show up as a companion, not a preacher — don't hand out answers, walk alongside them toward the light
+
 Our users include: spiritually curious seekers, new believers, growing Christians, and mature believers. Adjust your language and depth to match the current user's faith stage.
 
 Tone requirements:
@@ -492,7 +557,7 @@ Tone requirements:
 
 ${tone}
 
-Based on the user's emotional state, generate the following three sections:
+Based on the user's life emotion and starting from their daily situation, generate the following three sections:
 
 **Exegesis (exegesis)** (100-180 words, one paragraph):
 - Choose a Bible passage (WEB translation) that best fits the user's emotional state; provide the book, chapter, and verse
@@ -521,7 +586,8 @@ function buildLegacyUserPrompt(
   recentRefs: string[],
   candidates: string[],
 ): string {
-  let prompt = `用户当前的情绪: ${moodType}`;
+  const moodDesc = MOOD_CONTEXT_ZH[moodType] || moodType;
+  let prompt = `用户当前的生活情绪: ${moodDesc}`;
   if (moodText) {
     prompt += `\n用户的具体描述: ${moodText}`;
   }
@@ -541,9 +607,10 @@ function buildLegacyUserPromptEn(
   recentRefs: string[],
   candidates: string[],
 ): string {
-  let prompt = `User's current mood: ${moodType}`;
+  const moodDesc = MOOD_CONTEXT_EN[moodType] || moodType;
+  let prompt = `User's current life emotion: ${moodDesc}`;
   if (moodText) {
-    prompt += `\nUser's description: ${moodText}`;
+    prompt += `\nUser's own words: ${moodText}`;
   }
   if (candidates.length > 0) {
     prompt += `\n\nThe following scripture passages are related to this mood (prefer selecting from these):\n${candidates.join("\n")}`;
