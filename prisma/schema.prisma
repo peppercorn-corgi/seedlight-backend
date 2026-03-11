@@ -143,3 +143,15 @@ model PushLog {
   @@index([userId, createdAt])
   @@map("push_logs")
 }
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  event     String // mood_submit, content_view, share_link, share_image, save, unsave, like, unlike, audio_play, copy_verse, page_view
+  data      Json?  // flexible payload (e.g., { contentCardId, moodType, page, etc. })
+  createdAt DateTime @default(now())
+
+  @@index([event, createdAt])
+  @@index([userId, createdAt])
+  @@map("analytics_events")
+}

@@ -54,6 +54,39 @@ export function requireAuth(
 }
 
 /**
+ * Optional auth — sets req.user if token is valid, otherwise continues without auth.
+ * Useful for endpoints that work for both logged-in and anonymous users.
+ */
+export function optionalAuth(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
+  const header = req.headers.authorization;
+
+  if (!header?.startsWith("Bearer ")) {
+    next();
+    return;
+  }
+
+  const token = header.slice(7);
+
+  supabase.auth
+    .getUser(token)
+    .then(({ data, error }) => {
+      if (!error && data.user) {
+        req.user = {
+          sub: data.user.id,
+          email: data.user.email,
+          role: data.user.role,
+        };
+      }
+      next();
+    })
+    .catch(() => next());
+}
+
+/**
  * Resolve Supabase authProviderId to internal User.
  * Returns null if user hasn't called /api/auth/sync yet.
  */

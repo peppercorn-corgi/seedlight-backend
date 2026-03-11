@@ -9,3 +9,4 @@ public/audio/
 apprunner.yaml
 .DS_Store
 coverage/
+logs/
