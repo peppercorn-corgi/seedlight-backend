@@ -144,6 +144,19 @@ model PushLog {
   @@map("push_logs")
 }
 
+model UserFeedback {
+  id            String   @id @default(cuid())
+  userId        String?
+  contentCardId String?  // optionally linked to specific content
+  message       String
+  contact       String?  // optional email/wechat for follow-up
+  page          String?  // which page they submitted from
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("user_feedbacks")
+}
+
 model AnalyticsEvent {
   id        String   @id @default(cuid())
   userId    String?

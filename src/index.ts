@@ -20,6 +20,7 @@ import audioRouter from "./routes/audio.js";
 import feedbackRouter from "./routes/feedback.js";
 import userRouter from "./routes/user.js";
 import eventsRouter from "./routes/events.js";
+import userFeedbackRouter from "./routes/user-feedback.js";
 
 const app = express();
 
@@ -96,6 +97,7 @@ app.use("/api/audio", audioRouter);
 app.use("/api/feedback", feedbackRouter);
 app.use("/api/user", userRouter);
 app.use("/api/events", eventsRouter);
+app.use("/api/user-feedback", userFeedbackRouter);
 
 // ---------------------------------------------------------------------------
 // Error handler
