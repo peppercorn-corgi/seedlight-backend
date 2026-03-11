@@ -118,42 +118,45 @@ const PERSONAL_LINK_ZH: Record<string, string> = {
 
 const COVENANT_ZH: Record<string, string> = {
   seeker: `**圣约 (covenant)**（80-150字，一段话）：
-- 温和地呈现一个"如果愿意尝试"的邀请，绝不施压
-- 用"你可以试试看……"而不是"你应该……"的语气
-- 诚实地分享接受这份邀请可能带来的美好，以及错过可能的遗憾——不是恐吓，而是真诚地说"这值得你考虑"
-- 给出一个非常具体的、零门槛的行动建议（如"今晚睡前花一分钟安静想想这段话"）`,
+- 先给用户一份真实的盼望——让他们看到，当下的处境不是终点，生命中有更大的可能性在等待
+- 然后温和地呈现一个"如果愿意试试看"的邀请，绝不施压，用"你可以……"而不是"你应该……"
+- 给出一个非常具体的、零门槛的行动建议（如"今晚睡前花一分钟安静想想这段话"）
+- 整段话的感觉应该是：被人温柔地托住，然后看到了一点光`,
   new_believer: `**圣约 (covenant)**（80-150字，一段话）：
-- 温和地指出神在这段经文中的邀请，以及可以做出的简单回应
-- 诚实地说明忽略这份邀请可能错过的成长——不是恐吓，而是真诚地分享"这对你的信仰根基很重要"
-- 给出一个具体的、容易实践的行动建议（如一个简短的祷告、一个日常小习惯）`,
+- 先让初信者感到神的爱就在此刻——不是遥远的道理，而是此时此地的同在和安慰
+- 然后自然地指出经文中神的邀请，帮助他们看到回应这份邀请能带来的力量和改变
+- 给出一个具体的、容易实践的行动建议（如一个简短的祷告、一个日常小习惯）
+- 语气是鼓励和陪伴，像牧者轻轻拍着肩膀说"你可以的"`,
   growing: `**圣约 (covenant)**（80-150字，一段话）：
-- 清晰地指出神的邀请和信徒当有的回应
-- 坦诚地说明如果忽视这份呼召，属灵生命可能停滞在哪里
-- 给出一个有深度的、可操作的属灵操练建议（如默想经文的方式、具体的顺服行动）`,
+- 先帮信徒在当下的处境中看到神的信实——提醒他们不是独自面对，神的应许是真实的
+- 然后清晰地指出经文中神的邀请，以及回应这份邀请将如何更新他们的力量
+- 给出一个有深度的、可操作的属灵操练建议（如默想经文的方式、具体的顺服行动）
+- 这段话要让人读完后感到被坚固，愿意带着力量走回日常生活`,
   mature: `**圣约 (covenant)**（80-150字，一段话）：
-- 直接呈现神话语中的命令、应许与责任
-- 坦诚地指出不回应可能错失的属灵果实和事奉机会
-- 给出一个有挑战性的回应行动（如带领他人、在某个领域更深委身、为特定事项代祷）`,
+- 先从神的应许和信实出发，在经文中指出那份跨越时代的力量和盼望
+- 然后直接呈现神话语中的命令与责任，同时让人看到顺服带来的丰盛和自由
+- 给出一个有挑战性的回应行动（如带领他人、在某个领域更深委身、为特定事项代祷）
+- 这段话应该让成熟信徒被激励而非被责备，带着更新的异象和力量回到服事中`,
 };
 
 const SECULAR_LINK_ZH: Record<string, string> = {
   seeker: `**文化连结 (secularLink)**（80-150字，一段话）：
-- 完全从中华文化和日常生活的角度来呈现经文的智慧
-- 引用古典哲学、俗语、或现代生活中人人能共鸣的场景
-- 让人感到这不是外来的宗教说教，而是与自身文化深处相通的、关于人生的洞见
+- 从中华文化、生活智慧或人类共通经验出发，让经文的力量变得可感可触
+- 可以引用古诗词、俗语、名人故事、或日常生活中人人能共鸣的场景——重点是让人感到"你不是一个人在扛这些"
+- 这段话的目的是安慰和鼓舞，不是知识科普。用温暖的笔触，让读完的人获得一点力量
 - 不要提及神、耶稣、信仰等词汇，只用"古人的智慧"、"人生道理"等中性表达`,
   new_believer: `**文化连结 (secularLink)**（80-150字，一段话）：
-- 将经文的智慧与中华文化联系起来，帮助初信者看到信仰与自己文化根基并不冲突
-- 可以引用古典智慧、俗语，搭建文化与信仰之间的桥梁
-- 让人感到信仰不是割裂自己的文化身份，而是在更深层面上与之相通`,
+- 用中华文化的智慧或生活中的故事来呼应经文，让初信者感到信仰与自己的文化根基是相通的
+- 重点是给人安慰和力量——引用的典故或故事要能触动人心，不只是头脑上的对照
+- 让人读完后感到：原来这份信仰的智慧，和我从小耳濡目染的美好是一脉相承的`,
   growing: `**文化连结 (secularLink)**（80-150字，一段话）：
-- 将经文的属灵原则与中华文化中的相似智慧进行对话
-- 可以引用经典文学、哲学思想，展现圣经真理的普世性
-- 帮助信徒在文化处境中更好地理解和活出信仰`,
+- 将经文的属灵原则与中华文化中的智慧进行对话，用文化的力量加深经文的安慰
+- 可以引用经典文学、历史人物的经历，让人在文化共鸣中获得继续前行的力量
+- 不只是对照异同，更要让这段话本身成为一种鼓励`,
   mature: `**文化连结 (secularLink)**（80-150字，一段话）：
 - 在圣经真理与中华文化之间展开有深度的对话，可以指出相似之处也可以指出本质差异
-- 引用经典文学、哲学或神学家的文化反思
-- 帮助成熟信徒在文化使命中找到着力点，更有智慧地在自己的文化语境中见证信仰`,
+- 引用经典文学、哲学或历史人物的经历，帮助成熟信徒在反思中获得更深的力量和洞见
+- 不要停留在学术层面——要让文化的智慧和信仰的真理一起为读者注入信心和盼望`,
 };
 
 // =========================================================================
@@ -181,42 +184,45 @@ const PERSONAL_LINK_EN: Record<string, string> = {
 
 const COVENANT_EN: Record<string, string> = {
   seeker: `**Covenant (covenant)** (60-120 words, one paragraph):
-- Present a gentle "what if you tried this" invitation — no pressure whatsoever
-- Use "you might consider…" rather than "you should…"
-- Honestly share what embracing this invitation could bring, and what might be missed by passing it by — not as a threat, but as a sincere "this is worth considering"
-- Offer one very specific, zero-barrier action step (e.g., "spend one quiet minute tonight reflecting on these words")`,
+- Start by offering genuine hope — help them see that their current situation is not the end, and that life holds greater possibilities
+- Then present a gentle "what if you tried this" invitation — no pressure, use "you could…" not "you should…"
+- Offer one very specific, zero-barrier action step (e.g., "spend one quiet minute tonight reflecting on these words")
+- The whole paragraph should feel like being gently held and then glimpsing a ray of light`,
   new_believer: `**Covenant (covenant)** (60-120 words, one paragraph):
-- Gently name God's invitation in this passage and a simple response they can make
-- Honestly share what they might miss by ignoring this — not as a threat, but as sincere pastoral care: "this matters for your growth"
-- Offer one specific, easy-to-practice action step (e.g., a short prayer, a small daily habit)`,
+- Start by helping the new believer feel God's love right here and now — not a distant idea, but a present comfort and companionship
+- Then naturally point to God's invitation in the passage, showing how responding can bring real strength and change
+- Offer one specific, easy-to-practice action step (e.g., a short prayer, a small daily habit)
+- The tone is encouragement and companionship — like a pastor gently saying "you've got this"`,
   growing: `**Covenant (covenant)** (60-120 words, one paragraph):
-- Clearly name God's invitation and the faithful response called for
-- Honestly point out where spiritual growth may stall if this call is ignored
-- Offer one substantive, actionable spiritual discipline (e.g., a way to meditate on the passage, a specific act of obedience)`,
+- Start by helping the believer see God's faithfulness in their current situation — remind them they are not facing this alone, and God's promises are real
+- Then clearly name God's invitation in the passage and how responding will renew their strength
+- Offer one substantive, actionable spiritual discipline (e.g., a way to meditate on the passage, a specific act of obedience)
+- The reader should finish feeling strengthened and ready to carry that strength back into daily life`,
   mature: `**Covenant (covenant)** (60-120 words, one paragraph):
-- Directly present the command, promise, and responsibility found in God's word
-- Honestly name what spiritual fruit or ministry opportunity may be lost without response
-- Offer one challenging action step (e.g., mentoring someone, deeper commitment in a specific area, interceding for a particular cause)`,
+- Start from God's promises and faithfulness — point to the timeless strength and hope found in the passage
+- Then directly present the command and responsibility in God's word, while showing the abundance and freedom that obedience brings
+- Offer one challenging action step (e.g., mentoring someone, deeper commitment in a specific area, interceding for a particular cause)
+- This paragraph should inspire rather than rebuke — send them back into service with renewed vision and strength`,
 };
 
 const SECULAR_LINK_EN: Record<string, string> = {
   seeker: `**Cultural Connection (secularLink)** (60-120 words, one paragraph):
-- Present the scripture's wisdom entirely through the lens of Western culture and everyday life
-- Draw on philosophy (Stoics, Aristotle), literature (Shakespeare, C.S. Lewis, Tolkien), proverbs, or universally relatable modern-life scenarios
-- Help the reader feel this is not foreign religious instruction but an insight into life that resonates with truths they already sense
+- Use cultural wisdom, stories, or shared human experience to make the scripture's strength feel real and tangible
+- Draw on literature, philosophy, proverbs, or everyday scenarios — the goal is to help the reader feel "you are not alone in carrying this"
+- This paragraph is meant to comfort and empower, not to inform. Write with warmth so the reader finishes with a little more strength than before
 - Avoid explicitly religious language — use phrases like "ancient wisdom" or "a timeless observation about human nature"`,
   new_believer: `**Cultural Connection (secularLink)** (60-120 words, one paragraph):
-- Connect the scripture's wisdom to Western cultural heritage, helping the new believer see that faith and their cultural roots are not in conflict
-- Draw on philosophy, literature, or everyday life to bridge culture and faith
-- Help them feel that believing does not mean leaving their cultural identity behind, but discovering a deeper harmony`,
+- Use cultural wisdom or relatable stories to echo the scripture and help the new believer feel that faith is in harmony with the good things they have always known
+- The focus is comfort and strength — the references should touch the heart, not just the head
+- Help them feel: the wisdom in this faith connects with the beauty I have always sensed in the world`,
   growing: `**Cultural Connection (secularLink)** (60-120 words, one paragraph):
-- Bring the scripture's spiritual principles into dialogue with Western cultural wisdom
-- Reference classic literature, philosophy, or Christian thinkers to show the universal reach of biblical truth
-- Help the believer understand and live out their faith more richly within their own cultural context`,
+- Bring the scripture's spiritual principles into dialogue with cultural wisdom, using the power of culture to deepen the scripture's comfort
+- Reference literature, historical figures, or shared experiences that help the reader find strength to keep going
+- Don't just compare and contrast — make this paragraph itself a source of encouragement`,
   mature: `**Cultural Connection (secularLink)** (60-120 words, one paragraph):
-- Engage in a substantive dialogue between biblical truth and Western cultural tradition — noting both resonance and fundamental differences where appropriate
-- Reference classic literature, philosophy, or theologians' cultural reflections
-- Help mature believers find leverage points for cultural engagement and bearing witness wisely within their own cultural milieu`,
+- Engage in substantive dialogue between biblical truth and cultural tradition — noting both resonance and fundamental differences where appropriate
+- Reference literature, philosophy, or historical figures whose experiences help the reader gain deeper strength and insight
+- Go beyond the academic — let cultural wisdom and faith truth together infuse the reader with confidence and hope`,
 };
 
 // =========================================================================
