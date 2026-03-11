@@ -33,6 +33,27 @@ const TONE_GUIDE: Record<string, string> = {
 - 鼓励更深的委身和服事`,
 };
 
+const TONE_GUIDE_EN: Record<string, string> = {
+  seeker: `You are speaking with someone who is spiritually curious but not yet a Christian.
+- Use plain, accessible language — avoid church jargon (words like "sanctification" or "justification" need unpacking before use)
+- Build bridges from universal human experience and shared values toward biblical truth
+- Never assume any prior knowledge of Christian concepts or the Bible`,
+  new_believer: `You are speaking with a new believer who has recently come to faith.
+- Use an encouraging, nurturing tone — they are still learning to walk
+- Introduce faith concepts gradually, always explaining them simply
+- Help them build a solid foundation in Scripture and practical faith`,
+  growing: `You are speaking with a Christian who is actively growing in their faith.
+- You may introduce theological background and spiritual disciplines
+- Reference original Greek or Hebrew meanings when helpful, with a plain explanation alongside
+- Encourage consistent devotional habits and a deepening knowledge of God's character
+- Help them integrate faith into the practical realities of everyday life`,
+  mature: `You are speaking with a mature, seasoned Christian.
+- You may use theological terms and deeper exegetical insights
+- Offer substantive spiritual reflection, not surface-level encouragement
+- Reference Greek or Hebrew original meanings to illuminate the text's depth
+- Encourage deeper commitment, discipleship, and service`,
+};
+
 // =========================================================================
 // Optimized flow: pre-generated exegesis + real-time secularLink & covenant
 // =========================================================================
@@ -79,6 +100,48 @@ ${personalLinkSection}
 只返回JSON，不要包含markdown代码块标记。`;
 }
 
+function buildOptimizedSystemPromptEn(segment: string, hasMoodText: boolean): string {
+  const tone = TONE_GUIDE_EN[segment] || TONE_GUIDE_EN.seeker;
+
+  const personalLinkSection = hasMoodText ? `
+**Personal Connection (personalLink)**:
+- Based on what the user shared, write 1-2 paragraphs connecting the scripture's meaning to their specific situation
+- Help them feel this passage is speaking directly to them, not just generic spiritual advice
+- Flow naturally from the exegesis — like a pastor responding after quietly listening
+
+` : "";
+
+  const jsonFormat = hasMoodText
+    ? `{"personalLink":"...","secularLink":"...","covenant":"..."}`
+    : `{"secularLink":"...","covenant":"..."}`;
+
+  return `You are a gentle, wise pastor. You hold a Protestant fundamentalist theological position, but you speak warmly and without condescension.
+
+Tone requirements:
+- Speak like a caring pastor in quiet conversation, not a preacher at a pulpit
+- Do not open with "friend," "dear one," or similar salutations — go straight into the content
+- Warm but not sentimental; sincere but never preachy
+
+${tone}
+
+You will receive a scripture passage and its pre-written exegesis. Based on the user's emotional state, generate the following:
+${personalLinkSection}
+**Cultural Connection (secularLink)**:
+- Connect the scripture's wisdom to Western culture, philosophy, literature, or relatable everyday life
+- Draw on Western philosophy (Stoics, Aristotle, Augustine), literature (Shakespeare, C.S. Lewis, Tolkien), English proverbs, or modern Western life scenarios
+- Help the reader feel this wisdom is not foreign to their world — it speaks to universal human experience
+
+**Covenant (covenant)**:
+- Gently name God's invitation and the response a person can make
+- Honestly describe what is missed when this invitation is ignored — not as a threat, but as a sincere pastoral observation
+- Offer one specific, actionable step the reader can take today
+
+Format: write each section in 2-3 natural paragraphs, separated by \\n\\n. Do not write a single block of text.
+
+Return as JSON: ${jsonFormat}
+Return only the JSON — no markdown code block markers.`;
+}
+
 function buildOptimizedUserPrompt(
   moodType: string,
   moodText: string | undefined,
@@ -94,6 +157,25 @@ function buildOptimizedUserPrompt(
     prompt += `\n\n请根据用户的描述生成个人连结、文化连结和圣约内容。`;
   } else {
     prompt += `\n\n请生成文化连结和圣约内容。`;
+  }
+  return prompt;
+}
+
+function buildOptimizedUserPromptEn(
+  moodType: string,
+  moodText: string | undefined,
+  scriptureRef: string,
+  scriptureEn: string,
+  exegesis: string,
+): string {
+  let prompt = `User's mood: ${moodType}`;
+  if (moodText) prompt += `\nUser's description: ${moodText}`;
+  prompt += `\n\nScripture: ${scriptureRef}\n${scriptureEn}`;
+  prompt += `\n\nExegesis:\n${exegesis}`;
+  if (moodText) {
+    prompt += `\n\nPlease generate the personal connection, cultural connection, and covenant sections based on the user's description.`;
+  } else {
+    prompt += `\n\nPlease generate the cultural connection and covenant sections.`;
   }
   return prompt;
 }
@@ -175,6 +257,7 @@ async function generateOptimized(
   segment: string,
   moodType: string,
   tags: string[],
+  language: string,
   moodText?: string,
 ) {
   // 1. Get recently used refs
@@ -184,21 +267,25 @@ async function generateOptimized(
   const passage = await selectPassage(tags, recentRefs);
   if (!passage) return null; // no passages found, fallback needed
 
-  // 4. Fetch pre-generated exegesis
-  const exegesis = await getPreGeneratedExegesis(passage.id, segment);
+  // 4. Fetch pre-generated exegesis (language-aware)
+  const useEnglish = language === "en" || language === "both";
+  const exegesisLang = useEnglish ? "en" : "zh";
+  const exegesis = await getPreGeneratedExegesis(passage.id, segment, exegesisLang);
   if (!exegesis) return null; // no pre-gen available, fallback needed
 
   // 5. Call LLM for personalLink (if moodText) + secularLink + covenant
   const hasMoodText = !!moodText;
   const provider = getLlmProvider();
-  const systemPrompt = buildOptimizedSystemPrompt(segment, hasMoodText);
-  const userPrompt = buildOptimizedUserPrompt(
-    moodType, moodText,
-    passage.reference, passage.textZh, exegesis,
-  );
+
+  const systemPrompt = useEnglish
+    ? buildOptimizedSystemPromptEn(segment, hasMoodText)
+    : buildOptimizedSystemPrompt(segment, hasMoodText);
+  const userPrompt = useEnglish
+    ? buildOptimizedUserPromptEn(moodType, moodText, passage.reference, passage.textEn, exegesis)
+    : buildOptimizedUserPrompt(moodType, moodText, passage.reference, passage.textZh, exegesis);
 
   const fields = hasMoodText ? "personalLink+secularLink+covenant" : "secularLink+covenant";
-  console.log(`[LLM:opt] Generating ${fields} for "${passage.reference}", mood="${moodType}"`);
+  console.log(`[LLM:opt] Generating ${fields} for "${passage.reference}", mood="${moodType}", lang="${language}"`);
   const startTime = Date.now();
   const response = await provider.generate({
     system: systemPrompt,
@@ -274,6 +361,48 @@ ${tone}
 只返回JSON，不要包含markdown代码块标记或其他内容。`;
 }
 
+function buildLegacySystemPromptEn(segment: string): string {
+  const tone = TONE_GUIDE_EN[segment] || TONE_GUIDE_EN.seeker;
+
+  return `You are a gentle, wise pastor. You hold a Protestant fundamentalist theological position, but you speak warmly and without condescension.
+
+Tone requirements:
+- Speak like a caring pastor in quiet conversation, not a preacher at a pulpit
+- Do not open with "friend," "dear one," or similar salutations — go straight into the content
+- Warm but not sentimental; sincere but never preachy
+
+${tone}
+
+Based on the user's emotional state, generate the following three sections (ratio 4:4:2):
+
+**Section 1 — Exegesis (exegesis, 40%)**:
+- Choose a Bible passage (WEB translation) that best fits the user's emotional state; provide the book, chapter, and verse
+- Open with 1-2 sentences of context: who wrote it, to whom, and what was happening — this grounds the reader
+- Then explain the passage's meaning in an accessible way, connecting it to the user's current emotional state
+
+**Section 2 — Cultural Connection (secularLink, 40%)**:
+- Connect the scripture's wisdom to Western culture, philosophy, literature, or relatable everyday life
+- Draw on Western philosophy (Stoics, Aristotle, Augustine), literature (Shakespeare, C.S. Lewis, Tolkien), English proverbs, or modern Western life scenarios
+- Help the reader feel this wisdom speaks directly to their world and lived experience
+
+**Section 3 — Covenant (covenant, 20%)**:
+- Gently name God's invitation and the response a person can make
+- Honestly describe what is missed when this invitation is ignored — not as a threat, but as a sincere pastoral observation
+- Offer one specific, actionable step the reader can take today
+
+Format: write each section in 2-3 natural paragraphs, separated by \\n\\n. Do not write a single block of text.
+
+You must return a JSON object with the following fields:
+- scriptureRef: the scripture reference, e.g. "Philippians 4:6-7"
+- scriptureZh: the Chinese (CUV) text of the passage
+- scriptureEn: the English (WEB) text of the passage
+- exegesis: Section 1 — exegesis content (including background context)
+- secularLink: Section 2 — cultural connection content
+- covenant: Section 3 — covenant content
+
+Return only the JSON — no markdown code block markers or any other content.`;
+}
+
 function buildLegacyUserPrompt(
   moodType: string,
   moodText: string | undefined,
@@ -291,6 +420,26 @@ function buildLegacyUserPrompt(
     prompt += `\n\n请避免使用以下最近已用过的经文:\n${recentRefs.join("\n")}`;
   }
   prompt += "\n\n请根据以上信息生成属灵内容，以JSON格式返回。";
+  return prompt;
+}
+
+function buildLegacyUserPromptEn(
+  moodType: string,
+  moodText: string | undefined,
+  recentRefs: string[],
+  candidates: string[],
+): string {
+  let prompt = `User's current mood: ${moodType}`;
+  if (moodText) {
+    prompt += `\nUser's description: ${moodText}`;
+  }
+  if (candidates.length > 0) {
+    prompt += `\n\nThe following scripture passages are related to this mood (prefer selecting from these):\n${candidates.join("\n")}`;
+  }
+  if (recentRefs.length > 0) {
+    prompt += `\n\nPlease avoid using these recently used passages:\n${recentRefs.join("\n")}`;
+  }
+  prompt += "\n\nPlease generate spiritual content based on the above information and return it as JSON.";
   return prompt;
 }
 
@@ -326,23 +475,38 @@ async function generateLegacy(
   segment: string,
   moodType: string,
   tags: string[],
+  language: string,
   moodText?: string,
 ) {
+  const useEnglish = language === "en" || language === "both";
+
   // Use pre-computed tags to find candidates from DevotionalPassage
-  const passages = await prisma.devotionalPassage.findMany({
+  const MAX_VERSE_SPAN = 6;
+  const rawPassages = await prisma.devotionalPassage.findMany({
     where: { moodTags: { hasSome: tags } },
     orderBy: { importance: "desc" },
-    take: 5,
-    select: { reference: true, textZh: true },
+    take: 30,
+    select: { reference: true, textZh: true, textEn: true, verseStart: true, verseEnd: true },
   });
-  const candidateDescs = passages.map((p) => `${p.reference} - ${p.textZh.slice(0, 80)}`);
+  const passages = rawPassages
+    .filter((p) => (p.verseEnd ?? p.verseStart) - p.verseStart + 1 <= MAX_VERSE_SPAN)
+    .slice(0, 5);
+  const candidateDescs = passages.map((p) =>
+    useEnglish
+      ? `${p.reference} - ${p.textEn.slice(0, 80)}`
+      : `${p.reference} - ${p.textZh.slice(0, 80)}`,
+  );
 
   const recentRefs = await getRecentlyUsed(userId, 10);
-  const systemPrompt = buildLegacySystemPrompt(segment);
-  const userPrompt = buildLegacyUserPrompt(moodType, moodText, recentRefs, candidateDescs);
+  const systemPrompt = useEnglish
+    ? buildLegacySystemPromptEn(segment)
+    : buildLegacySystemPrompt(segment);
+  const userPrompt = useEnglish
+    ? buildLegacyUserPromptEn(moodType, moodText, recentRefs, candidateDescs)
+    : buildLegacyUserPrompt(moodType, moodText, recentRefs, candidateDescs);
 
   const provider = getLlmProvider();
-  console.log(`[LLM:legacy] Full generation for mood="${moodType}", user=${userId}`);
+  console.log(`[LLM:legacy] Full generation for mood="${moodType}", user=${userId}, lang="${language}"`);
   const startTime = Date.now();
   const response = await provider.generate({
     system: systemPrompt,
@@ -380,6 +544,9 @@ export async function generateContent(
 ) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
+  // "both" defaults to English for content generation; bilingual users see both scriptures in the UI
+  const language = user.language;
+
   // Build tags: if moodText provided, extract focused tags; otherwise expand from moodType
   const moodTags = expandMoodTags(moodType);
   let tags = moodTags;
@@ -400,10 +567,10 @@ export async function generateContent(
 
   // Try optimized flow (pre-generated exegesis + partial LLM)
   try {
-    const result = await generateOptimized(userId, user.segment, moodType, tags, moodText);
+    const result = await generateOptimized(userId, user.segment, moodType, tags, language, moodText);
     if (result) {
       console.log(`[content] Optimized flow succeeded for ${userId}`);
-      return { ...result, language: user.language };
+      return { ...result, language };
     }
     console.log(`[content] Optimized flow: no passage/exegesis found, falling back`);
   } catch (err) {
@@ -411,6 +578,6 @@ export async function generateContent(
   }
 
   // Fallback to legacy full generation
-  const result = await generateLegacy(userId, user.segment, moodType, tags, moodText);
-  return { ...result, language: user.language };
+  const result = await generateLegacy(userId, user.segment, moodType, tags, language, moodText);
+  return { ...result, language };
 }

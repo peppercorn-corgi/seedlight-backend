@@ -1,17 +1,18 @@
 /**
- * Phase 2: Pre-generate exegesis for devotional passages.
+ * Pre-generate English exegesis for devotional passages.
  *
- * For each DevotionalPassage, generates exegesis for all 4 faith segments
- * in a single Claude CLI call. Stores results in PreGeneratedExegesis.
+ * Same structure as the Chinese pre-gen script, but generates English content
+ * with Western cultural context. Uses textEn for scripture input.
+ * Stores results with language="en" in PreGeneratedExegesis.
  *
- * Logs to: logs/pregenerate-exegesis.log
+ * Logs to: logs/pregenerate-exegesis-en.log
  *
  * Usage:
- *   npx tsx scripts/pregenerate-exegesis.ts                      # all passages
- *   npx tsx scripts/pregenerate-exegesis.ts --min-importance 7   # high priority first
- *   npx tsx scripts/pregenerate-exegesis.ts --resume             # skip completed
- *   npx tsx scripts/pregenerate-exegesis.ts --limit 100          # process N passages
- *   npx tsx scripts/pregenerate-exegesis.ts --dry-run            # preview only
+ *   npx tsx scripts/pregenerate-exegesis-en.ts                      # all passages
+ *   npx tsx scripts/pregenerate-exegesis-en.ts --min-importance 7   # high priority first
+ *   npx tsx scripts/pregenerate-exegesis-en.ts --resume             # skip completed
+ *   npx tsx scripts/pregenerate-exegesis-en.ts --limit 100          # process N passages
+ *   npx tsx scripts/pregenerate-exegesis-en.ts --dry-run            # preview only
  */
 
 import { spawn } from "node:child_process";
@@ -24,7 +25,7 @@ import { PrismaClient } from "@prisma/client";
 // ---------------------------------------------------------------------------
 const LOG_DIR = path.join(import.meta.dirname, "..", "logs");
 if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
-const LOG_FILE = path.join(LOG_DIR, "pregenerate-exegesis.log");
+const LOG_FILE = path.join(LOG_DIR, "pregenerate-exegesis-en.log");
 const logStream = fs.createWriteStream(LOG_FILE, { flags: "a" });
 
 function log(msg: string) {
@@ -101,27 +102,27 @@ async function callClaude(prompt: string, systemPrompt: string): Promise<string>
 }
 
 // ---------------------------------------------------------------------------
-// System prompt
+// System prompt — English exegesis generation
 // ---------------------------------------------------------------------------
-const SYSTEM_PROMPT = `你是一位温柔、有智慧的牧者，持守基督教基要派神学立场，说话温和、不居高临下。
+const SYSTEM_PROMPT = `You are a gentle, wise pastor grounded in Protestant evangelical theology. Your tone is warm, caring, and never condescending.
 
-任务：为一段圣经经文生成4个版本的"释经"内容，分别面向不同信仰阶段的读者。
+Task: Generate 4 versions of scripture exegesis for a Bible passage, each tailored to a different faith stage.
 
-每个版本要求（200-400字）：
-1. 先用1-2句话简要介绍经文背景（谁写的、写给谁、当时处境）
-2. 深入浅出地解释经文含义
-3. 语气像关怀的牧者在安静地与人谈心
+Each version should be 150-300 words:
+1. Begin with 1-2 sentences of context (who wrote it, audience, historical situation)
+2. Explain the passage's meaning in an accessible, insightful way
+3. Write as if a caring pastor is having a quiet conversation with someone
 
-四个版本的区别：
-- **seeker** (慕道友): 通俗易懂，避免教会术语，从生活经验出发
-- **new_believer** (初信者): 鼓励引导，逐步引入信仰概念，简明解释
-- **growing** (成长中): 适度引入神学背景、原文含义（附通俗解释），鼓励灵修习惯
-- **mature** (成熟信徒): 可用神学术语，提供深层属灵洞见，引用原文帮助理解
+The four versions differ in depth and terminology:
+- **seeker**: Use everyday language, avoid church jargon. Connect from life experience and universal human questions. When using terms like "grace" or "redemption", briefly explain them.
+- **new_believer**: Encouraging and guiding. Gradually introduce faith concepts with clear explanations. Build confidence in understanding scripture.
+- **growing**: Include theological background, original language insights (with accessible explanations), and encourage spiritual disciplines. Connect passage to broader biblical themes.
+- **mature**: Use theological terminology freely. Provide deep spiritual insights, cross-references, and original language analysis. Challenge toward deeper application.
 
-返回JSON对象，key为segment名，value为释经文本：
+Return a JSON object with segment names as keys and exegesis text as values:
 {"seeker":"...","new_believer":"...","growing":"...","mature":"..."}
 
-只返回JSON，不要解释。`;
+Return only JSON, no explanation.`;
 
 // ---------------------------------------------------------------------------
 // Fix literal newlines inside JSON string values
@@ -143,42 +144,36 @@ function fixJsonNewlines(str: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Extract segment values by key boundaries (avoids JSON.parse issues with
-// unescaped quotes in LLM output)
+// Extract segment values by key boundaries
 // ---------------------------------------------------------------------------
 function extractSegments(rawInput: string): Record<string, string> | null {
-  // Strip markdown code block wrappers if present
   const raw = rawInput.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "");
   const result: Record<string, string> = {};
 
   for (let i = 0; i < SEGMENTS.length; i++) {
     const key = SEGMENTS[i];
-    // Find "key": " pattern
     const keyPattern = new RegExp(`"${key}"\\s*:\\s*"`);
     const keyMatch = raw.match(keyPattern);
     if (!keyMatch || keyMatch.index === undefined) return null;
 
     const valueStart = keyMatch.index + keyMatch[0].length;
 
-    // Find end boundary: next segment key or closing brace
     let valueEnd = -1;
     const nextKey = SEGMENTS[i + 1];
     if (nextKey) {
-      // Look for ",\s*\n\s*"nextKey" pattern (the comma + next key)
       const endPattern = new RegExp(`",\\s*\\n\\s*"${nextKey}"\\s*:`);
       const endMatch = raw.slice(valueStart).match(endPattern);
       if (!endMatch || endMatch.index === undefined) return null;
       valueEnd = valueStart + endMatch.index;
     } else {
-      // Last key: find closing "\n} (possibly with trailing whitespace/backticks)
       const endMatch = raw.slice(valueStart).match(/"\s*\n\s*\}/);
       if (!endMatch || endMatch.index === undefined) return null;
       valueEnd = valueStart + endMatch.index;
     }
 
     const value = raw.slice(valueStart, valueEnd)
-      .replace(/\n/g, "")        // remove literal newlines
-      .replace(/\\n/g, "\n");    // convert escaped \n to real newlines
+      .replace(/\n/g, "")
+      .replace(/\\n/g, "\n");
     result[key] = value;
   }
 
@@ -186,12 +181,12 @@ function extractSegments(rawInput: string): Record<string, string> | null {
 }
 
 // ---------------------------------------------------------------------------
-// Process one passage → 4 segments
+// Process one passage → 4 English segments
 // ---------------------------------------------------------------------------
 async function processPassage(
-  passage: { id: string; reference: string; textZh: string },
+  passage: { id: string; reference: string; textEn: string },
 ): Promise<Record<string, string> | null> {
-  const prompt = `经文：${passage.reference}\n\n${passage.textZh}\n\n请为4个信仰阶段生成释经。`;
+  const prompt = `Scripture: ${passage.reference}\n\n${passage.textEn}\n\nPlease generate exegesis for all 4 faith stages.`;
 
   const raw = await callClaude(prompt, SYSTEM_PROMPT);
 
@@ -202,9 +197,8 @@ async function processPassage(
     return null;
   }
 
-  // Validate all 4 segments present and non-trivial
   for (const seg of SEGMENTS) {
-    if (typeof parsed[seg] !== "string" || parsed[seg].length < 50) {
+    if (typeof parsed[seg] !== "string" || parsed[seg].length < 30) {
       log(`  ✗ Missing/short segment "${seg}" for ${passage.reference}`);
       return null;
     }
@@ -217,12 +211,11 @@ async function processPassage(
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
-  log(`=== pregenerate-exegesis started ===`);
+  log(`=== pregenerate-exegesis-en started ===`);
   log(`  Dry run: ${DRY_RUN}, Resume: ${RESUME}`);
   log(`  Min importance: ${MIN_IMPORTANCE}, Limit: ${LIMIT || "none"}`);
   log(`  Log file: ${LOG_FILE}`);
 
-  // Get passages to process
   const where: Record<string, unknown> = {};
   if (MIN_IMPORTANCE > 1) {
     where.importance = { gte: MIN_IMPORTANCE };
@@ -230,15 +223,15 @@ async function main() {
 
   let passages = await prisma.devotionalPassage.findMany({
     where,
-    select: { id: true, reference: true, textZh: true, importance: true },
+    select: { id: true, reference: true, textEn: true, importance: true },
     orderBy: { importance: "desc" },
   });
 
-  // If resuming, filter out passages that already have all 4 segments
+  // If resuming, filter out passages that already have all 4 English segments
   if (RESUME) {
     const completed = await prisma.preGeneratedExegesis.groupBy({
       by: ["passageId"],
-      where: { language: "zh" },
+      where: { language: "en" },
       _count: true,
       having: { passageId: { _count: { gte: 4 } } },
     });
@@ -277,12 +270,12 @@ async function main() {
         for (const seg of SEGMENTS) {
           await prisma.preGeneratedExegesis.upsert({
             where: {
-              passageId_segment_language: { passageId: p.id, segment: seg, language: "zh" },
+              passageId_segment_language: { passageId: p.id, segment: seg, language: "en" },
             },
             create: {
               passageId: p.id,
               segment: seg,
-              language: "zh",
+              language: "en",
               exegesis: result[seg],
             },
             update: {
@@ -293,7 +286,7 @@ async function main() {
       }
 
       processed++;
-      log(`${progress} ${p.reference} (imp=${p.importance}) → 4 segments (${elapsed}s)`);
+      log(`${progress} ${p.reference} (imp=${p.importance}) → 4 EN segments (${elapsed}s)`);
     } catch (err) {
       errors++;
       log(`${progress} ${p.reference} ✗ ${(err as Error).message.slice(0, 150)}`);
@@ -301,12 +294,12 @@ async function main() {
   }
 
   const totalMin = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
-  log(`=== pregenerate-exegesis done (${totalMin} min) ===`);
+  log(`=== pregenerate-exegesis-en done (${totalMin} min) ===`);
   log(`  Processed: ${processed}, Errors: ${errors}`);
 
   if (!DRY_RUN) {
-    const dbCount = await prisma.preGeneratedExegesis.count();
-    log(`  DB total: ${dbCount} exegeses`);
+    const dbCount = await prisma.preGeneratedExegesis.count({ where: { language: "en" } });
+    log(`  DB total (EN): ${dbCount} exegeses`);
   }
 
   await prisma.$disconnect();

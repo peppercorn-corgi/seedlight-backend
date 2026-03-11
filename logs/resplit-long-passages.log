@@ -1,0 +1,74 @@
+[2026-03-10T23:54:32.711Z] === resplit-long-passages started ===
+[2026-03-10T23:54:32.712Z]   Max verse span: 6
+[2026-03-10T23:54:32.712Z]   Dry run: true
+[2026-03-10T23:54:32.712Z]   Limit: 3
+[2026-03-10T23:54:35.031Z]   Found 3 passages with span > 6
+[2026-03-10T23:55:29.717Z] [1/3] 诗篇 121:1-8 (8v) → 2 passages (54.7s)
+[2026-03-10T23:55:38.677Z] [2/3] 诗篇 22:1-31 (31v) → 5 passages (9.0s)
+[2026-03-10T23:55:48.248Z] [3/3] 以赛亚书 53:4-12 (9v) → 3 passages (9.6s)
+[2026-03-10T23:55:48.248Z] === resplit-long-passages done (1.2 min) ===
+[2026-03-10T23:55:48.249Z]   Processed: 3, Created: 0, Deleted: 0, Errors: 0
+[2026-03-11T00:03:09.517Z] === resplit-long-passages started ===
+[2026-03-11T00:03:09.518Z]   Max verse span: 6
+[2026-03-11T00:03:09.518Z]   Dry run: true
+[2026-03-11T00:03:09.518Z]   Limit: 5
+[2026-03-11T00:03:11.759Z]   Found 5 passages with span > 6
+[2026-03-11T00:03:49.152Z] [1/5] 诗篇 121:1-8 (8v) → 2 passages (37.4s)
+[2026-03-11T00:03:49.153Z]   拆分: v1-2(yearning,hopeful,humble,peaceful,trust,faith) | v3-8(peaceful,grateful,hopeful,content,fearful,waiting)
+[2026-03-11T00:03:58.284Z] [2/5] 诗篇 22:1-31 (31v) → 5 passages (9.1s)
+[2026-03-11T00:03:58.285Z]   拆分: v1-5(lonely,desperate,fearful,hopeful,trust,faith) | v6-11(ashamed,sorrowful,insecure,humble,yearning) | v19-21(desperate,hopeful,fearful,yearning,trust) | v22-26(grateful,joyful,hopeful,humble,content,peaceful) | v27-31(joyful,hopeful,grateful,peaceful,yearning)
+[2026-03-11T00:04:06.685Z] [3/5] 以赛亚书 53:4-12 (9v) → 3 passages (8.4s)
+[2026-03-11T00:04:06.685Z]   拆分: v4-6(sorrowful,guilty,humble,grateful,ashamed,peaceful) | v7-9(sorrowful,humble,peaceful,tender,grieving,heartbroken) | v10-12(hopeful,grateful,joyful,worship,yearning,content)
+[2026-03-11T00:04:24.533Z] [4/5] 马可福音 5:25-34 (10v) → 2 passages (17.8s)
+[2026-03-11T00:04:24.533Z]   拆分: v25-29(desperate,exhausted,hopeful,yearning,humble,fearful) | v30-34(fearful,humble,peaceful,grateful,tender)
+[2026-03-11T00:04:31.396Z] [5/5] 马可福音 5:35-43 (9v) → 2 passages (6.9s)
+[2026-03-11T00:04:31.396Z]   拆分: v35-40(fearful,desperate,hopeful,sorrowful,grieving,trust) | v41-43(hopeful,joyful,humble,grateful,overwhelmed,yearning)
+[2026-03-11T00:04:31.396Z] === resplit-long-passages done (1.3 min) ===
+[2026-03-11T00:04:31.396Z]   Processed: 5, Created: 0, Deleted: 0, Errors: 0
+[2026-03-11T00:06:21.169Z] === resplit-long-passages started ===
+[2026-03-11T00:06:21.170Z]   Max verse span: 6
+[2026-03-11T00:06:21.171Z]   Dry run: true
+[2026-03-11T00:06:21.171Z]   Limit: 2
+[2026-03-11T00:06:23.367Z]   Found 2 passages with span > 6
+[2026-03-11T00:07:06.951Z] [1/2] 诗篇 121:1-8 (8v) → 2 passages (43.6s)
+[2026-03-11T00:07:06.952Z]   拆分: v1-4(yearning,hopeful,humble,peaceful,faith,trust,sovereignty) | v5-8(peaceful,grateful,content,hopeful,suffering,trust,covenant)
+[2026-03-11T00:07:16.661Z] [2/2] 诗篇 22:1-31 (31v) → 5 passages (9.7s)
+[2026-03-11T00:07:16.662Z]   拆分: v1-5(desperate,lonely,sorrowful,yearning,hopeful,trust) | v6-11(ashamed,humble,lonely,fearful,desperate,trust) | v19-21(desperate,hopeful,yearning,fearful,trust) | v22-26(grateful,joyful,hopeful,humble,peaceful,worship) | v27-31(hopeful,joyful,peaceful,grateful,worship)
+[2026-03-11T00:07:16.662Z] === resplit-long-passages done (0.9 min) ===
+[2026-03-11T00:07:16.662Z]   Processed: 2, Created: 0, Deleted: 0, Errors: 0
+[2026-03-11T00:07:46.338Z] === resplit-long-passages started ===
+[2026-03-11T00:07:46.340Z]   Max verse span: 6
+[2026-03-11T00:07:46.340Z]   Dry run: true
+[2026-03-11T00:07:46.340Z]   Limit: 2
+[2026-03-11T00:07:48.523Z]   Found 2 passages with span > 6
+[2026-03-11T00:07:55.568Z] [1/2] 诗篇 121:1-8 (8v) → 2 passages (7.0s)
+[2026-03-11T00:07:55.568Z]   拆分: v1-2(yearning,hopeful,trust,humble,peaceful) | v3-8(peaceful,grateful,fearful,hopeful,content,exhausted)
+[2026-03-11T00:08:05.338Z]   ⚠ 诗篇 22:1-31: missing verses [12,13,14,15,16,17,18] — accepting partial coverage
+[2026-03-11T00:08:05.338Z] [2/2] 诗篇 22:1-31 (31v) → 5 passages (9.8s)
+[2026-03-11T00:08:05.338Z]   拆分: v1-5(desperate,lonely,fearful,hopeful,trust,grieving) | v6-11(ashamed,lonely,sorrowful,humble,desperate,yearning) | v19-21(desperate,hopeful,yearning,fearful,trust) | v22-26(grateful,joyful,hopeful,humble,peaceful,tender) | v27-31(hopeful,joyful,grateful,peaceful,yearning)
+[2026-03-11T00:08:05.338Z] === resplit-long-passages done (0.3 min) ===
+[2026-03-11T00:08:05.338Z]   Processed: 2, Created: 0, Deleted: 0, Errors: 0
+[2026-03-11T00:08:19.938Z] === resplit-long-passages started ===
+[2026-03-11T00:08:19.939Z]   Max verse span: 6
+[2026-03-11T00:08:19.939Z]   Dry run: true
+[2026-03-11T00:08:19.939Z]   Limit: 2
+[2026-03-11T00:08:22.129Z]   Found 2 passages with span > 6
+[2026-03-11T00:08:28.347Z] [1/2] 诗篇 121:1-8 (8v) → 2 passages (6.2s)
+[2026-03-11T00:08:28.348Z]   拆分: v1-4(yearning,hopeful,peaceful,trust,faith) | v5-8(peaceful,grateful,content,hopeful,fearful)
+[2026-03-11T00:08:38.799Z]   ⚠ 诗篇 22:1-31: missing verses [12,13,14,15,16,17,18] — accepting partial coverage
+[2026-03-11T00:08:38.800Z] [2/2] 诗篇 22:1-31 (31v) → 5 passages (10.5s)
+[2026-03-11T00:08:38.800Z]   拆分: v1-5(desperate,sorrowful,lonely,fearful,hopeful,trust) | v6-11(ashamed,lonely,humble,sorrowful,desperate,trust) | v19-21(desperate,hopeful,fearful,yearning) | v22-26(grateful,joyful,humble,hopeful,peaceful) | v27-31(hopeful,joyful,peaceful,grateful,content)
+[2026-03-11T00:08:38.800Z] === resplit-long-passages done (0.3 min) ===
+[2026-03-11T00:08:38.800Z]   Processed: 2, Created: 0, Deleted: 0, Errors: 0
+[2026-03-11T00:08:59.035Z] === resplit-long-passages started ===
+[2026-03-11T00:08:59.036Z]   Max verse span: 6
+[2026-03-11T00:08:59.036Z]   Dry run: true
+[2026-03-11T00:08:59.036Z]   Limit: 2
+[2026-03-11T00:09:01.364Z]   Found 2 passages with span > 6
+[2026-03-11T00:09:06.964Z] [1/2] 诗篇 121:1-8 (8v) → 2 passages (5.6s)
+[2026-03-11T00:09:06.964Z]   拆分: v1-4(yearning,hopeful,peaceful,trust,faith) | v5-8(peaceful,grateful,content,hopeful,fearful)
+[2026-03-11T00:09:15.152Z]   ⚠ 诗篇 22:1-31: auto-filled missing verses [12,13,14,15,16,17,18,25,26,27,28,29,30,31]
+[2026-03-11T00:09:15.152Z] [2/2] 诗篇 22:1-31 (31v) → 7 passages (8.2s)
+[2026-03-11T00:09:15.152Z]   拆分: v1-5(desperate,sorrowful,lonely,hopeful,trust,fearful) | v6-11(ashamed,sorrowful,humble,lonely,desperate,trust) | v12-17(suffering,sorrowful,hopeful,faith) | v18(suffering,sorrowful,hopeful,faith) | v19-24(hopeful,desperate,grateful,peaceful,trust,joyful) | v25-30(suffering,sorrowful,hopeful,faith) | v31(suffering,sorrowful,hopeful,faith)
+[2026-03-11T00:09:15.152Z] === resplit-long-passages done (0.2 min) ===
+[2026-03-11T00:09:15.152Z]   Processed: 2, Created: 0, Deleted: 0, Errors: 0

@@ -52,14 +52,20 @@ export async function selectPassage(
   importance: number;
 } | null> {
   // Query passages matching any of the expanded tags
-  const candidates = await prisma.devotionalPassage.findMany({
+  const MAX_VERSE_SPAN = 6;
+  const rawCandidates = await prisma.devotionalPassage.findMany({
     where: {
       moodTags: { hasSome: tags },
       ...(excludeRefs.length > 0 ? { reference: { notIn: excludeRefs } } : {}),
     },
     orderBy: { importance: "desc" },
-    take: 50, // get top 50 candidates
+    take: 200,
   });
+
+  // Filter out passages that span too many verses
+  const candidates = rawCandidates
+    .filter((c) => (c.verseEnd ?? c.verseStart) - c.verseStart + 1 <= MAX_VERSE_SPAN)
+    .slice(0, 50);
 
   if (candidates.length === 0) {
     console.log(`[passage] No candidates found for tags=[${tags.join(",")}], excludeRefs=${excludeRefs.length}`);
@@ -121,10 +127,11 @@ export async function extractTagsFromText(moodText: string): Promise<string[]> {
 export async function getPreGeneratedExegesis(
   passageId: string,
   segment: string,
+  language: string = "zh",
 ): Promise<string | null> {
   const record = await prisma.preGeneratedExegesis.findUnique({
     where: {
-      passageId_segment: { passageId, segment },
+      passageId_segment_language: { passageId, segment, language },
     },
   });
   return record?.exegesis ?? null;

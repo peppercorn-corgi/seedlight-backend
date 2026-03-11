@@ -21,29 +21,37 @@ console.log(`[audio] TTS provider: Google Cloud WaveNet (credentials: ${hasCrede
 
 function buildTtsText(card: {
   scriptureZh: string;
+  scriptureEn: string;
   scriptureRef: string;
   exegesis: string;
   secularLink: string;
   covenant: string;
+  language: string;
 }): string {
-  return [
-    `${card.scriptureRef}。${card.scriptureZh}`,
-    card.exegesis,
-    card.secularLink,
-    card.covenant,
-  ].join("。。");
+  const scripture = card.language === "en"
+    ? `${card.scriptureRef}. ${card.scriptureEn}`
+    : `${card.scriptureRef}。${card.scriptureZh}`;
+  const separator = card.language === "en" ? ". . " : "。。";
+  return [scripture, card.exegesis, card.secularLink, card.covenant].join(separator);
 }
 
-async function synthesize(text: string): Promise<Buffer> {
+const TTS_VOICES: Record<string, { languageCode: string; name: string; speakingRate: number }> = {
+  zh: { languageCode: "cmn-CN", name: "cmn-CN-Wavenet-A", speakingRate: 0.95 },
+  en: { languageCode: "en-US", name: "en-US-Wavenet-F", speakingRate: 1.0 },
+};
+
+async function synthesize(text: string, language: string): Promise<Buffer> {
+  const voice = TTS_VOICES[language] || TTS_VOICES.zh;
+
   const request: protos.google.cloud.texttospeech.v1.ISynthesizeSpeechRequest = {
     input: { text },
     voice: {
-      languageCode: "cmn-CN",
-      name: "cmn-CN-Wavenet-A",
+      languageCode: voice.languageCode,
+      name: voice.name,
     },
     audioConfig: {
       audioEncoding: "MP3" as unknown as protos.google.cloud.texttospeech.v1.AudioEncoding,
-      speakingRate: 0.95,
+      speakingRate: voice.speakingRate,
     },
   };
 
@@ -79,7 +87,7 @@ export async function generateAudio(contentCardId: string): Promise<string | nul
     let buf: Buffer | null = null;
     for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
       try {
-        buf = await synthesize(text);
+        buf = await synthesize(text, card.language);
         break;
       } catch (err) {
         console.error(`[audio] TTS attempt ${attempt}/${TTS_MAX_RETRIES} failed:`, (err as Error).message);

@@ -119,12 +119,13 @@ model PreGeneratedExegesis {
   passageId String
   passage   DevotionalPassage @relation(fields: [passageId], references: [id])
   segment   String // seeker | new_believer | growing | mature
+  language  String  @default("zh") // zh | en
   exegesis  String // Pre-generated exegesis text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([passageId, segment])
+  @@unique([passageId, segment, language])
   @@map("pre_generated_exegeses")
 }
 

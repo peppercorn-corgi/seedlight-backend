@@ -7,8 +7,13 @@ const router = Router();
 
 const VALID_FAITH_LEVELS = ["seeker", "new_believer", "growing", "mature"] as const;
 
+const VALID_LANGUAGES = ["zh", "en", "both"] as const;
+
 const preferencesSchema = z.object({
-  faithLevel: z.enum(VALID_FAITH_LEVELS),
+  faithLevel: z.enum(VALID_FAITH_LEVELS).optional(),
+  language: z.enum(VALID_LANGUAGES).optional(),
+}).refine((data) => data.faithLevel || data.language, {
+  message: "At least one of faithLevel or language is required",
 });
 
 // GET /api/user/preferences
@@ -16,7 +21,7 @@ router.get("/preferences", requireAuth, async (req, res, next) => {
   try {
     const user = await prisma.user.findFirst({
       where: { authProviderId: req.user!.sub },
-      select: { segment: true, onboarded: true },
+      select: { segment: true, language: true, onboarded: true },
     });
 
     if (!user) {
@@ -24,7 +29,7 @@ router.get("/preferences", requireAuth, async (req, res, next) => {
       return;
     }
 
-    res.json({ faithLevel: user.segment, onboarded: user.onboarded });
+    res.json({ faithLevel: user.segment, language: user.language, onboarded: user.onboarded });
   } catch (err) {
     next(err);
   }
@@ -48,12 +53,26 @@ router.put("/preferences", requireAuth, async (req, res, next) => {
       return;
     }
 
-    await prisma.user.update({
+    const updateData: Record<string, unknown> = {};
+    if (parsed.data.faithLevel) {
+      updateData.segment = parsed.data.faithLevel;
+      updateData.onboarded = true;
+    }
+    if (parsed.data.language) {
+      updateData.language = parsed.data.language;
+    }
+
+    const updated = await prisma.user.update({
       where: { id: user.id },
-      data: { segment: parsed.data.faithLevel, onboarded: true },
+      data: updateData,
+      select: { segment: true, language: true, onboarded: true },
     });
 
-    res.json({ faithLevel: parsed.data.faithLevel, onboarded: true });
+    res.json({
+      faithLevel: updated.segment,
+      language: updated.language,
+      onboarded: updated.onboarded,
+    });
   } catch (err) {
     next(err);
   }
