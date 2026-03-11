@@ -39,7 +39,8 @@ const prisma = new PrismaClient();
 // ---------------------------------------------------------------------------
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
-const RESUME = args.includes("--resume");
+const FORCE = args.includes("--force");
+const RESUME = !FORCE && args.includes("--resume");
 const MIN_IMPORTANCE = args.includes("--min-importance")
   ? parseInt(args[args.indexOf("--min-importance") + 1], 10)
   : 1;
@@ -107,16 +108,15 @@ const SYSTEM_PROMPT = `你是一位温柔、有智慧的牧者，持守基督教
 
 任务：为一段圣经经文生成4个版本的"释经"内容，分别面向不同信仰阶段的读者。
 
-每个版本要求（200-400字）：
-1. 先用1-2句话简要介绍经文背景（谁写的、写给谁、当时处境）
-2. 深入浅出地解释经文含义
-3. 语气像关怀的牧者在安静地与人谈心
+**必须使用简体中文，不得使用繁体字。**
 
-四个版本的区别：
-- **seeker** (慕道友): 通俗易懂，避免教会术语，从生活经验出发
-- **new_believer** (初信者): 鼓励引导，逐步引入信仰概念，简明解释
-- **growing** (成长中): 适度引入神学背景、原文含义（附通俗解释），鼓励灵修习惯
-- **mature** (成熟信徒): 可用神学术语，提供深层属灵洞见，引用原文帮助理解
+共同要求：写成一段话，适合手机碎片时间阅读。语气像关怀的牧者在安静地与人谈心，不要写成论文。
+
+四个版本的区别（经文背景的篇幅随信仰程度递减）：
+- **seeker** (慕道友, 150-250字): 用2-3句话介绍经文背景（谁写的、写给谁、当时处境），帮助完全不了解圣经的读者建立上下文。通俗易懂，避免教会术语，从生活经验出发解释经文含义。
+- **new_believer** (初信者, 150-220字): 用1-2句话简述经文背景，鼓励引导，逐步引入信仰概念并简明解释，帮助建立信仰根基。
+- **growing** (成长中, 120-200字): 用1句话点明背景即可（读者已有基本圣经知识），将篇幅留给神学背景、原文含义（附通俗解释），鼓励灵修习惯。
+- **mature** (成熟信徒, 100-180字): 无需介绍背景（读者熟悉圣经），直接进入深层属灵洞见，可用神学术语，引用原文帮助理解。
 
 返回JSON对象，key为segment名，value为释经文本：
 {"seeker":"...","new_believer":"...","growing":"...","mature":"..."}
@@ -218,7 +218,7 @@ async function processPassage(
 // ---------------------------------------------------------------------------
 async function main() {
   log(`=== pregenerate-exegesis started ===`);
-  log(`  Dry run: ${DRY_RUN}, Resume: ${RESUME}`);
+  log(`  Dry run: ${DRY_RUN}, Force: ${FORCE}, Resume: ${RESUME}`);
   log(`  Min importance: ${MIN_IMPORTANCE}, Limit: ${LIMIT || "none"}`);
   log(`  Log file: ${LOG_FILE}`);
 

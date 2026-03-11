@@ -52,7 +52,7 @@ export async function selectPassage(
   importance: number;
 } | null> {
   // Query passages matching any of the expanded tags
-  const MAX_VERSE_SPAN = 6;
+  const MAX_VERSE_SPAN = 7;
   const rawCandidates = await prisma.devotionalPassage.findMany({
     where: {
       moodTags: { hasSome: tags },

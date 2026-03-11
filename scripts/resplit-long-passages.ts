@@ -38,6 +38,7 @@ function log(msg: string) {
 }
 
 const prisma = new PrismaClient();
+const forceSplitRefs: string[] = [];
 
 // ---------------------------------------------------------------------------
 // CLI args
@@ -200,6 +201,9 @@ async function processPassage(
   }
 
   // Validate tags and spans
+  // Accept up to MAX_SPAN+1 (7 verses) — trust Claude's judgment for strong narratives.
+  // Prompt still asks for ≤6, so Claude will split when possible; 7 means it decided not to.
+  const HARD_CAP = MAX_SPAN + 1;
   const validTags = new Set(ALL_TAGS as readonly string[]);
   const cleaned = parsed
     .map((p) => ({
@@ -211,12 +215,11 @@ async function processPassage(
     }))
     .filter((p) => {
       const span = (p.verseEnd ?? p.verseStart) - p.verseStart + 1;
-      return p.moodTags.length > 0 && span <= MAX_SPAN && span > 0;
+      return p.moodTags.length > 0 && span <= HARD_CAP && span > 0;
     });
 
   if (cleaned.length === 0) {
-    // Fallback: Claude returned the passage without splitting (e.g. 7-verse narrative).
-    // Mechanically split into ≤MAX_SPAN chunks, reuse tags from Claude's response.
+    // Fallback: Claude returned 8+ verse segments — force-split at midpoint.
     if (parsed.length > 0) {
       const srcTags = (parsed[0].moodTags || []).filter((t: string) => validTags.has(t));
       const srcThemes = (parsed[0].themes || []).filter((t: string) => validTags.has(t));
@@ -230,7 +233,8 @@ async function processPassage(
         { verseStart: allNums[0], verseEnd: allNums[mid - 1], moodTags: fallbackTags, themes: fallbackThemes, importance: imp },
         { verseStart: allNums[mid], verseEnd: allNums[allNums.length - 1], moodTags: fallbackTags, themes: fallbackThemes, importance: imp },
       );
-      log(`  ⚠ ${passage.reference}: force-split at midpoint (Claude did not split)`);
+      forceSplitRefs.push(passage.reference);
+      log(`  ⚠ ${passage.reference}: force-split at midpoint (Claude returned 8+ verse segment)`);
     }
   }
 
@@ -316,6 +320,9 @@ async function main() {
   let created = 0;
   let deleted = 0;
   let errors = 0;
+  let keptNarrative = 0;
+  let forceSplit = 0;
+  const forceSplitList: string[] = [];
   const startTime = Date.now();
 
   for (let i = 0; i < longPassages.length; i++) {
@@ -330,6 +337,14 @@ async function main() {
 
       if (!results) {
         errors++;
+        continue;
+      }
+
+      // Claude returned single passage with same range → strong narrative, skip DB changes
+      if (results.length === 1 && results[0].verseStart === p.verseStart && results[0].verseEnd === p.verseEnd) {
+        log(`${progress} ${p.reference} (${span}v) → kept as strong narrative (${elapsed}s)`);
+        processed++;
+        keptNarrative++;
         continue;
       }
 
@@ -411,6 +426,11 @@ async function main() {
   const totalMin = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
   log(`=== resplit-long-passages done (${totalMin} min) ===`);
   log(`  Processed: ${processed}, Created: ${created}, Deleted: ${deleted}, Errors: ${errors}`);
+  log(`  Kept as strong narrative: ${keptNarrative}, Force-split: ${forceSplitRefs.length}`);
+  if (forceSplitRefs.length > 0) {
+    log(`  Force-split passages (review these):`);
+    for (const ref of forceSplitRefs) log(`    - ${ref}`);
+  }
 
   if (!DRY_RUN) {
     const dbCount = await prisma.devotionalPassage.count();
