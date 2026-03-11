@@ -28,8 +28,14 @@ if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
 const LOG_FILE = path.join(LOG_DIR, "pregenerate-exegesis-en.log");
 const logStream = fs.createWriteStream(LOG_FILE, { flags: "a" });
 
+function localTimestamp() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function log(msg: string) {
-  const line = `[${new Date().toISOString()}] ${msg}`;
+  const line = `[${localTimestamp()}] ${msg}`;
   logStream.write(line + "\n");
 }
 
@@ -158,12 +164,12 @@ function extractSegments(rawInput: string): Record<string, string> | null {
     let valueEnd = -1;
     const nextKey = SEGMENTS[i + 1];
     if (nextKey) {
-      const endPattern = new RegExp(`",\\s*\\n\\s*"${nextKey}"\\s*:`);
+      const endPattern = new RegExp(`",\\s*"${nextKey}"\\s*:`);
       const endMatch = raw.slice(valueStart).match(endPattern);
       if (!endMatch || endMatch.index === undefined) return null;
       valueEnd = valueStart + endMatch.index;
     } else {
-      const endMatch = raw.slice(valueStart).match(/"\s*\n\s*\}/);
+      const endMatch = raw.slice(valueStart).match(/"\s*\}/);
       if (!endMatch || endMatch.index === undefined) return null;
       valueEnd = valueStart + endMatch.index;
     }

@@ -12,6 +12,7 @@
  *   npx tsx scripts/pregenerate-exegesis.ts --resume             # skip completed
  *   npx tsx scripts/pregenerate-exegesis.ts --limit 100          # process N passages
  *   npx tsx scripts/pregenerate-exegesis.ts --dry-run            # preview only
+ *   npx tsx scripts/pregenerate-exegesis.ts --force --after "2026-03-11 17:00"  # re-gen entries not updated since
  */
 
 import { spawn } from "node:child_process";
@@ -27,8 +28,14 @@ if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
 const LOG_FILE = path.join(LOG_DIR, "pregenerate-exegesis.log");
 const logStream = fs.createWriteStream(LOG_FILE, { flags: "a" });
 
+function localTimestamp() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function log(msg: string) {
-  const line = `[${new Date().toISOString()}] ${msg}`;
+  const line = `[${localTimestamp()}] ${msg}`;
   logStream.write(line + "\n");
 }
 
@@ -47,6 +54,9 @@ const MIN_IMPORTANCE = args.includes("--min-importance")
 const LIMIT = args.includes("--limit")
   ? parseInt(args[args.indexOf("--limit") + 1], 10)
   : 0;
+const AFTER = args.includes("--after")
+  ? new Date(args[args.indexOf("--after") + 1])
+  : null;
 
 const SEGMENTS = ["seeker", "new_believer", "growing", "mature"] as const;
 
@@ -164,14 +174,14 @@ function extractSegments(rawInput: string): Record<string, string> | null {
     let valueEnd = -1;
     const nextKey = SEGMENTS[i + 1];
     if (nextKey) {
-      // Look for ",\s*\n\s*"nextKey" pattern (the comma + next key)
-      const endPattern = new RegExp(`",\\s*\\n\\s*"${nextKey}"\\s*:`);
+      // Look for ","nextKey": pattern (comma + optional whitespace/newlines + next key)
+      const endPattern = new RegExp(`",\\s*"${nextKey}"\\s*:`);
       const endMatch = raw.slice(valueStart).match(endPattern);
       if (!endMatch || endMatch.index === undefined) return null;
       valueEnd = valueStart + endMatch.index;
     } else {
-      // Last key: find closing "\n} (possibly with trailing whitespace/backticks)
-      const endMatch = raw.slice(valueStart).match(/"\s*\n\s*\}/);
+      // Last key: find closing "} (with optional whitespace/newlines)
+      const endMatch = raw.slice(valueStart).match(/"\s*\}/);
       if (!endMatch || endMatch.index === undefined) return null;
       valueEnd = valueStart + endMatch.index;
     }
@@ -219,6 +229,7 @@ async function processPassage(
 async function main() {
   log(`=== pregenerate-exegesis started ===`);
   log(`  Dry run: ${DRY_RUN}, Force: ${FORCE}, Resume: ${RESUME}`);
+  log(`  After: ${AFTER ? AFTER.toISOString() : "none"}`);
   log(`  Min importance: ${MIN_IMPORTANCE}, Limit: ${LIMIT || "none"}`);
   log(`  Log file: ${LOG_FILE}`);
 
@@ -246,6 +257,20 @@ async function main() {
     const before = passages.length;
     passages = passages.filter((p) => !completedSet.has(p.id));
     log(`  Resume: ${completedSet.size} complete, ${passages.length}/${before} remaining`);
+  }
+
+  // If --after, skip passages whose exegesis was already updated after the given time
+  if (AFTER) {
+    const recentlyUpdated = await prisma.preGeneratedExegesis.groupBy({
+      by: ["passageId"],
+      where: { language: "zh", updatedAt: { gte: AFTER } },
+      _count: true,
+      having: { passageId: { _count: { gte: 4 } } },
+    });
+    const recentSet = new Set(recentlyUpdated.map((c) => c.passageId));
+    const before = passages.length;
+    passages = passages.filter((p) => !recentSet.has(p.id));
+    log(`  After filter: ${recentSet.size} already updated, ${passages.length}/${before} remaining`);
   }
 
   if (LIMIT > 0) {

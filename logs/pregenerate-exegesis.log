@@ -882,3 +882,29 @@ ConnectorError(ConnectorError { user_facing_error
 [2026-03-11T08:30:02.051Z] [334/3096] 马可福音 13:11 (imp=9) → 4 segments (71.4s)
 [2026-03-11T08:31:13.120Z] [335/3096] 马可福音 13:13 (imp=9) → 4 segments (68.4s)
 [2026-03-11T08:32:32.500Z] [336/3096] 马太福音 6:14-15 (imp=9) → 4 segments (76.6s)
+[2026-03-11T09:03:17.775Z] === pregenerate-exegesis started ===
+[2026-03-11T09:03:17.775Z]   Dry run: false, Force: true, Resume: false
+[2026-03-11T09:03:17.775Z]   Min importance: 8, Limit: none
+[2026-03-11T09:03:17.775Z]   Log file: /Users/benson/dev/fun/easybible/seedlight-backend/logs/pregenerate-exegesis.log
+[2026-03-11T09:03:20.267Z]   Processing 4579 passages (×4 segments = 18316 exegeses)
+[2026-03-11T09:04:55.809Z] [1/4579] 但以理书 4:13-17 (imp=10) → 4 segments (92.8s)
+[2026-03-11T09:06:52.572Z] [2/4579] 以西结书 37:21-22 (imp=10) → 4 segments (114.1s)
+[2026-03-11T09:08:18.150Z] [3/4579] 马太福音 24:21-22 (imp=10) → 4 segments (82.8s)
+[2026-03-11T09:09:47.469Z] [4/4579] 但以理书 2:41-45 (imp=10) → 4 segments (85.8s)
+[2026-03-11T09:11:27.590Z] [5/4579] 启示录 13:5-8 (imp=10) → 4 segments (97.4s)
+[2026-03-11T09:13:22.625Z] [6/4579] 启示录 10:5-7 (imp=10) → 4 segments (112.4s)
+[2026-03-11T09:13:57.264Z]   ✗ Extract failed for 希伯来书 9:19-22
+[2026-03-11T09:13:57.265Z]   Raw (first 300): ```json\n{"seeker":"希伯来书是新约圣经里的一封信，写给一群犹太背景的基督徒，帮助他们理解耶稣与古老宗教仪式之间的关系。这段经文描述了几千年前以色列人在旷野时，领袖摩西用动物的血举行一种庄严的立约仪式——把血洒在书卷和百姓身上，宣告这是神与人之间契约的凭证。听起来也许有点陌生，但背后的逻辑其实很贴近人心：生命是宝贵的，犯错是有代价的，而这个代价需要有人来承担。血代表生命，流血意味着一条生命为另一条生命的过错付出了代价。这段话最后说"若不流血，罪就不得赦免"——这不是在强调残忍，而是在说：真正的宽恕从来不是轻描淡写的，它需要真实的代价。而基督徒相信，耶稣后来所做的，正是把这个代价
+[2026-03-11T09:15:38.969Z] [8/4579] 箴言 7:21-23 (imp=10) → 4 segments (98.0s)
+[2026-03-11T09:18:10.290Z] [9/4579] 罗马书 9:10-13 (imp=10) → 4 segments (148.7s)
+[2026-03-11T22:27:28] === pregenerate-exegesis started ===
+[2026-03-11T22:27:28]   Dry run: false, Force: true, Resume: false
+[2026-03-11T22:27:28]   After: 2026-03-11T09:00:00.000Z
+[2026-03-11T22:27:28]   Min importance: 1, Limit: none
+[2026-03-11T22:27:28]   Log file: /Users/benson/dev/fun/easybible/seedlight-backend/logs/pregenerate-exegesis.log
+[2026-03-11T22:27:31]   After filter: 8 already updated, 8222/8230 remaining
+[2026-03-11T22:27:31]   Processing 8222 passages (×4 segments = 32888 exegeses)
+[2026-03-11T22:29:02] [1/8222] 希伯来书 9:19-22 (imp=10) → 4 segments (88.7s)
+[2026-03-11T22:30:46] [2/8222] 约翰福音 11:49-53 (imp=10) → 4 segments (101.4s)
+[2026-03-11T22:32:26] [3/8222] 约翰福音 10:34-38 (imp=10) → 4 segments (97.3s)
+[2026-03-11T22:34:53] [4/8222] 约翰福音 8:42-47 (imp=10) → 4 segments (143.5s)

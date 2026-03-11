@@ -34,6 +34,30 @@ export async function getRecentlyUsedRefs(userId: string, limit: number): Promis
 }
 
 // ---------------------------------------------------------------------------
+// Testament / book category weight multipliers
+//   Gospels are the most devotionally resonant for evangelicals
+//   Other NT epistles are practical and theology-rich
+//   Psalms/Proverbs are emotionally strong OT books
+// ---------------------------------------------------------------------------
+const GOSPEL_BOOKS = new Set(["Matthew", "Mark", "Luke", "John"]);
+const NT_BOOKS = new Set([
+  "Matthew", "Mark", "Luke", "John", "Acts",
+  "Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+  "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
+  "1 Timothy", "2 Timothy", "Titus", "Philemon",
+  "Hebrews", "James", "1 Peter", "2 Peter",
+  "1 John", "2 John", "3 John", "Jude", "Revelation",
+]);
+const DEVOTIONAL_OT = new Set(["Psalms", "Proverbs", "Isaiah"]);
+
+function bookWeight(book: string): number {
+  if (GOSPEL_BOOKS.has(book)) return 2.5;
+  if (NT_BOOKS.has(book)) return 2.0;
+  if (DEVOTIONAL_OT.has(book)) return 1.3;
+  return 1.0;
+}
+
+// ---------------------------------------------------------------------------
 // Select a passage by mood tags with weighted random selection
 // ---------------------------------------------------------------------------
 export async function selectPassage(
@@ -72,22 +96,24 @@ export async function selectPassage(
     return null;
   }
 
-  // Weighted random selection by importance
-  // importance 10 → weight 10, importance 1 → weight 1
-  const totalWeight = candidates.reduce((sum, c) => sum + c.importance, 0);
+  // Weighted random selection: importance × book category weight
+  const weights = candidates.map((c) => c.importance * bookWeight(c.book));
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
   let roll = Math.random() * totalWeight;
 
-  for (const c of candidates) {
-    roll -= c.importance;
+  for (let i = 0; i < candidates.length; i++) {
+    roll -= weights[i];
     if (roll <= 0) {
-      console.log(`[passage] Selected "${c.reference}" (imp=${c.importance}) from ${candidates.length} candidates, query=[${tags.join(",")}], passage_tags=[${c.moodTags.join(",")}]`);
+      const c = candidates[i];
+      console.log(`[passage] Selected "${c.reference}" (imp=${c.importance}, bw=${bookWeight(c.book)}) from ${candidates.length} candidates, query=[${tags.join(",")}], passage_tags=[${c.moodTags.join(",")}]`);
       return c;
     }
   }
 
   // Fallback to first
-  console.log(`[passage] Fallback "${candidates[0].reference}" (imp=${candidates[0].importance}) from ${candidates.length} candidates`);
-  return candidates[0];
+  const c0 = candidates[0];
+  console.log(`[passage] Fallback "${c0.reference}" (imp=${c0.importance}, bw=${bookWeight(c0.book)}) from ${candidates.length} candidates`);
+  return c0;
 }
 
 // ---------------------------------------------------------------------------
