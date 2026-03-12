@@ -1,5 +1,4 @@
 import { getLlmProvider } from "./llm/index.js";
-import { findByReference, getRecentlyUsed } from "./scripture.js";
 import {
   expandMoodTags,
   extractTagsFromText,
@@ -586,9 +585,6 @@ ${covenantGuide}
 格式要求：每个部分写成一段话，不要分成多个段落。在每段文字中，用 **加粗标记** 包裹1-2句最触动心灵的话（如"**这句话会被高亮**"）。高亮的必须是直接给人安慰、温暖或力量的句子——那种让人想停下来反复品味的话，而不是分析性、比较性或知识性的观点。段落之间用\\n\\n分隔。
 
 你必须以JSON格式返回，包含以下字段：
-- scriptureRef: 经文引用，格式如 "腓立比书 4:6-7"（使用中文书卷名）
-- scriptureZh: 和合本中文经文原文
-- scriptureEn: 英文经文(WEB版本)
 - exegesis: 释经内容（包含经文背景介绍）
 - secularLink: 文化连结内容
 - covenant: 圣约内容
@@ -636,9 +632,6 @@ ${covenantGuide}
 Format: write each section as a single paragraph. Within each paragraph, wrap 1-2 sentences in **bold markers** (e.g., "**this sentence will be highlighted**"). The highlighted text must be sentences that directly comfort, warm, or empower the reader — the kind of words that make someone pause and feel seen. Do NOT highlight analytical comparisons or intellectual observations. Separate sections with \\n\\n.
 
 You must return a JSON object with the following fields:
-- scriptureRef: the scripture reference, e.g. "Philippians 4:6-7"
-- scriptureZh: the Chinese (CUV) text of the passage
-- scriptureEn: the English (WEB) text of the passage
 - exegesis: exegesis content (including background context)
 - secularLink: cultural connection content
 - covenant: covenant content
@@ -649,60 +642,46 @@ Return only the JSON — no markdown code block markers or any other content.`;
 function buildLegacyUserPrompt(
   moodType: string,
   moodText: string | undefined,
-  recentRefs: string[],
-  candidates: string[],
+  scriptureRef: string,
+  scriptureText: string,
 ): string {
   const moodDesc = MOOD_CONTEXT_ZH[moodType] || moodType;
   let prompt = `用户当前的生活情绪: ${moodDesc}`;
   if (moodText) {
     prompt += `\n用户的具体描述: ${moodText}`;
   }
-  if (candidates.length > 0) {
-    prompt += `\n\n以下是与该情绪相关的经文候选（优先从中选择）:\n${candidates.join("\n")}`;
-  }
-  if (recentRefs.length > 0) {
-    prompt += `\n\n请避免使用以下最近已用过的经文:\n${recentRefs.join("\n")}`;
-  }
-  prompt += "\n\n请根据以上信息生成属灵内容，以JSON格式返回。";
+  prompt += `\n\n经文: ${scriptureRef}\n${scriptureText}`;
+  prompt += "\n\n请根据以上经文和用户情绪，生成释经、文化连结、圣约三部分内容，以JSON格式返回。";
   return prompt;
 }
 
 function buildLegacyUserPromptEn(
   moodType: string,
   moodText: string | undefined,
-  recentRefs: string[],
-  candidates: string[],
+  scriptureRef: string,
+  scriptureText: string,
 ): string {
   const moodDesc = MOOD_CONTEXT_EN[moodType] || moodType;
   let prompt = `User's current life emotion: ${moodDesc}`;
   if (moodText) {
     prompt += `\nUser's own words: ${moodText}`;
   }
-  if (candidates.length > 0) {
-    prompt += `\n\nThe following scripture passages are related to this mood (prefer selecting from these):\n${candidates.join("\n")}`;
-  }
-  if (recentRefs.length > 0) {
-    prompt += `\n\nPlease avoid using these recently used passages:\n${recentRefs.join("\n")}`;
-  }
-  prompt += "\n\nPlease generate spiritual content based on the above information and return it as JSON.";
+  prompt += `\n\nScripture: ${scriptureRef}\n${scriptureText}`;
+  prompt += "\n\nBased on the above scripture and user's mood, generate exegesis, cultural connection, and covenant sections. Return as JSON.";
   return prompt;
 }
 
-interface FullAiResponse {
-  scriptureRef: string;
-  scriptureZh: string;
-  scriptureEn: string;
+interface LegacyAiResponse {
   exegesis: string;
   secularLink: string;
   covenant: string;
 }
 
-function parseFullResponse(text: string): FullAiResponse {
+function parseLegacyResponse(text: string): LegacyAiResponse {
   const cleaned = text.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
-  // scriptureEn/scriptureZh are optional here — they get filled from DB later (lines 752-754)
-  const required = ["scriptureRef", "exegesis", "secularLink", "covenant"] as const;
+  const required = ["exegesis", "secularLink", "covenant"] as const;
 
-  const validate = (o: unknown): o is FullAiResponse =>
+  const validate = (o: unknown): o is LegacyAiResponse =>
     !!o && required.every((k) => typeof (o as Record<string, unknown>)[k] === "string"
       && ((o as Record<string, unknown>)[k] as string).trim() !== "");
 
@@ -713,7 +692,7 @@ function parseFullResponse(text: string): FullAiResponse {
   try { const p = JSON.parse(cleaned.replace(/\n/g, "\\n")); if (validate(p)) return p; } catch { /* */ }
 
   // Strategy 3: order-independent key-boundary extraction
-  return extractKeyValues(cleaned, required) as FullAiResponse;
+  return extractKeyValues(cleaned, required) as LegacyAiResponse;
 }
 
 async function generateLegacy(
@@ -726,33 +705,23 @@ async function generateLegacy(
 ) {
   const useEnglish = language === "en" || language === "both";
 
-  // Use pre-computed tags to find candidates from DevotionalPassage
-  const MAX_VERSE_SPAN = 7;
-  const rawPassages = await prisma.devotionalPassage.findMany({
-    where: { moodTags: { hasSome: tags } },
-    orderBy: { importance: "desc" },
-    take: 30,
-    select: { reference: true, textZh: true, textEn: true, verseStart: true, verseEnd: true },
-  });
-  const passages = rawPassages
-    .filter((p) => (p.verseEnd ?? p.verseStart) - p.verseStart + 1 <= MAX_VERSE_SPAN)
-    .slice(0, 5);
-  const candidateDescs = passages.map((p) =>
-    useEnglish
-      ? `${p.reference} - ${p.textEn.slice(0, 80)}`
-      : `${p.reference} - ${p.textZh.slice(0, 80)}`,
-  );
+  // Select passage from DB (same as optimize flow)
+  const recentlyUsedRefs = await getRecentlyUsedRefs(userId, 10);
+  const passage = await selectPassage(tags, recentlyUsedRefs);
+  if (!passage) {
+    throw new Error("No matching passage found for legacy flow");
+  }
 
-  const recentRefs = await getRecentlyUsed(userId, 10);
   const systemPrompt = useEnglish
     ? buildLegacySystemPromptEn(segment)
     : buildLegacySystemPrompt(segment);
+  const scriptureText = useEnglish ? passage.textEn : passage.textZh;
   const userPrompt = useEnglish
-    ? buildLegacyUserPromptEn(moodType, moodText, recentRefs, candidateDescs)
-    : buildLegacyUserPrompt(moodType, moodText, recentRefs, candidateDescs);
+    ? buildLegacyUserPromptEn(moodType, moodText, passage.reference, scriptureText)
+    : buildLegacyUserPrompt(moodType, moodText, passage.reference, scriptureText);
 
   const provider = getLlmProvider();
-  console.log(`[LLM:legacy] Full generation for mood="${moodType}", user=${userId}, lang="${language}"`);
+  console.log(`[LLM:legacy] Generating exegesis+secularLink+covenant for "${passage.reference}", mood="${moodType}", lang="${language}"`);
   const startTime = Date.now();
   const response = await provider.generate({
     system: systemPrompt,
@@ -762,23 +731,16 @@ async function generateLegacy(
   console.log(`[LLM:legacy] Done in ${((Date.now() - startTime) / 1000).toFixed(1)}s, model=${response.model}`);
 
   console.log("[LLM:legacy] Raw:\n" + response.text);
-  const aiResult = parseFullResponse(response.text);
-
-  // Ensure scripture text fields exist (LLM may omit them)
-  if (!aiResult.scriptureZh) aiResult.scriptureZh = "";
-  if (!aiResult.scriptureEn) aiResult.scriptureEn = "";
-
-  // Verify scripture reference in DB and fill authoritative text
-  const dbScripture = await findByReference(aiResult.scriptureRef);
-  const verified = dbScripture !== null;
-  if (dbScripture) {
-    aiResult.scriptureZh = dbScripture.textZh;
-    aiResult.scriptureEn = dbScripture.textEn;
-  }
+  const aiResult = parseLegacyResponse(response.text);
 
   return {
-    ...aiResult,
-    verified,
+    scriptureRef: passage.reference,
+    scriptureZh: passage.textZh,
+    scriptureEn: passage.textEn,
+    exegesis: aiResult.exegesis,
+    secularLink: aiResult.secularLink,
+    covenant: aiResult.covenant,
+    verified: true,
     aiModel: response.model,
   };
 }
