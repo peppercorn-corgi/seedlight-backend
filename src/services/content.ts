@@ -9,6 +9,16 @@ import {
 import { prisma } from "../lib/db.js";
 
 // ---------------------------------------------------------------------------
+// Build English reference from passage fields (e.g. "Psalms 42:5")
+// ---------------------------------------------------------------------------
+function buildEnglishRef(passage: { book: string; chapter: number; verseStart: number; verseEnd: number | null }): string {
+  const verses = passage.verseEnd && passage.verseEnd !== passage.verseStart
+    ? `${passage.verseStart}-${passage.verseEnd}`
+    : `${passage.verseStart}`;
+  return `${passage.book} ${passage.chapter}:${verses}`;
+}
+
+// ---------------------------------------------------------------------------
 // Mood daily-life context — helps the LLM understand the user's real situation
 // ---------------------------------------------------------------------------
 const MOOD_CONTEXT_ZH: Record<string, string> = {
@@ -504,12 +514,13 @@ async function generateOptimized(
   const systemPrompt = useEnglish
     ? buildOptimizedSystemPromptEn(segment, hasMoodText)
     : buildOptimizedSystemPrompt(segment, hasMoodText);
+  const displayRef = useEnglish ? buildEnglishRef(passage) : passage.reference;
   const userPrompt = useEnglish
-    ? buildOptimizedUserPromptEn(moodType, moodText, passage.reference, passage.textEn, exegesis)
+    ? buildOptimizedUserPromptEn(moodType, moodText, displayRef, passage.textEn, exegesis)
     : buildOptimizedUserPrompt(moodType, moodText, passage.reference, passage.textZh, exegesis);
 
   const fields = hasMoodText ? "personalLink+secularLink+covenant" : "secularLink+covenant";
-  console.log(`[LLM:opt] Generating ${fields} for "${passage.reference}", mood="${moodType}", lang="${language}"`);
+  console.log(`[LLM:opt] Generating ${fields} for "${displayRef}", mood="${moodType}", lang="${language}"`);
   const startTime = Date.now();
   const response = await provider.generate({
     system: systemPrompt,
@@ -528,7 +539,7 @@ async function generateOptimized(
     : exegesis;
 
   return {
-    scriptureRef: passage.reference,
+    scriptureRef: displayRef,
     scriptureZh: passage.textZh,
     scriptureEn: passage.textEn,
     exegesis: finalExegesis,
@@ -712,16 +723,17 @@ async function generateLegacy(
     throw new Error("No matching passage found for legacy flow");
   }
 
+  const displayRef = useEnglish ? buildEnglishRef(passage) : passage.reference;
   const systemPrompt = useEnglish
     ? buildLegacySystemPromptEn(segment)
     : buildLegacySystemPrompt(segment);
   const scriptureText = useEnglish ? passage.textEn : passage.textZh;
   const userPrompt = useEnglish
-    ? buildLegacyUserPromptEn(moodType, moodText, passage.reference, scriptureText)
+    ? buildLegacyUserPromptEn(moodType, moodText, displayRef, scriptureText)
     : buildLegacyUserPrompt(moodType, moodText, passage.reference, scriptureText);
 
   const provider = getLlmProvider();
-  console.log(`[LLM:legacy] Generating exegesis+secularLink+covenant for "${passage.reference}", mood="${moodType}", lang="${language}"`);
+  console.log(`[LLM:legacy] Generating exegesis+secularLink+covenant for "${displayRef}", mood="${moodType}", lang="${language}"`);
   const startTime = Date.now();
   const response = await provider.generate({
     system: systemPrompt,
@@ -734,7 +746,7 @@ async function generateLegacy(
   const aiResult = parseLegacyResponse(response.text);
 
   return {
-    scriptureRef: passage.reference,
+    scriptureRef: displayRef,
     scriptureZh: passage.textZh,
     scriptureEn: passage.textEn,
     exegesis: aiResult.exegesis,
