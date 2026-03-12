@@ -12,6 +12,7 @@
  *   npx tsx scripts/pregenerate-exegesis-en.ts --min-importance 7   # high priority first
  *   npx tsx scripts/pregenerate-exegesis-en.ts --resume             # skip completed
  *   npx tsx scripts/pregenerate-exegesis-en.ts --limit 100          # process N passages
+ *   npx tsx scripts/pregenerate-exegesis-en.ts --concurrency 5      # 5 parallel workers
  *   npx tsx scripts/pregenerate-exegesis-en.ts --dry-run            # preview only
  */
 
@@ -53,6 +54,9 @@ const MIN_IMPORTANCE = args.includes("--min-importance")
 const LIMIT = args.includes("--limit")
   ? parseInt(args[args.indexOf("--limit") + 1], 10)
   : 0;
+const CONCURRENCY = args.includes("--concurrency")
+  ? parseInt(args[args.indexOf("--concurrency") + 1], 10)
+  : 1;
 
 const SEGMENTS = ["seeker", "new_believer", "growing", "mature"] as const;
 
@@ -256,15 +260,14 @@ async function main() {
   }
 
   log(`  Processing ${passages.length} passages (×4 segments = ${passages.length * 4} exegeses)`);
+  log(`  Concurrency: ${CONCURRENCY}`);
 
   let processed = 0;
   let errors = 0;
   const startTime = Date.now();
 
-  for (let i = 0; i < passages.length; i++) {
-    const p = passages[i];
-    const progress = `[${i + 1}/${passages.length}]`;
-
+  async function worker(p: typeof passages[number], index: number) {
+    const progress = `[${index + 1}/${passages.length}]`;
     try {
       const pStart = Date.now();
       const result = await processPassage(p);
@@ -272,7 +275,7 @@ async function main() {
 
       if (!result) {
         errors++;
-        continue;
+        return;
       }
 
       if (!DRY_RUN) {
@@ -301,6 +304,17 @@ async function main() {
       log(`${progress} ${p.reference} ✗ ${(err as Error).message.slice(0, 150)}`);
     }
   }
+
+  const active = new Set<Promise<void>>();
+  for (let i = 0; i < passages.length; i++) {
+    const task = worker(passages[i], i).finally(() => active.delete(task));
+    active.add(task);
+
+    if (active.size >= CONCURRENCY) {
+      await Promise.race(active);
+    }
+  }
+  await Promise.allSettled(active);
 
   const totalMin = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
   log(`=== pregenerate-exegesis-en done (${totalMin} min) ===`);
