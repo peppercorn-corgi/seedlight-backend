@@ -53,7 +53,8 @@ router.post("/", requireAuth, async (req, res, next) => {
     });
 
     // Generate content
-    const content = await generateContent(user.id, moodType!, moodText);
+    const forceLegacy = req.query.flow === "legacy";
+    const content = await generateContent(user.id, moodType!, moodText, forceLegacy);
 
     // Save content card
     const contentCard = await prisma.contentCard.create({

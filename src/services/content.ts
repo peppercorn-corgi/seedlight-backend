@@ -753,6 +753,7 @@ export async function generateContent(
   userId: string,
   moodType: string,
   moodText?: string,
+  forceLegacy?: boolean,
 ) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
@@ -778,15 +779,20 @@ export async function generateContent(
   }
 
   // Try optimized flow (pre-generated exegesis + partial LLM)
-  try {
-    const result = await generateOptimized(userId, user.segment, moodType, tags, language, moodText);
-    if (result) {
-      console.log(`[content] Optimized flow succeeded for ${userId}`);
-      return { ...result, language };
+  const skipOptimize = forceLegacy || process.env.FORCE_LEGACY === "1";
+  if (!skipOptimize) {
+    try {
+      const result = await generateOptimized(userId, user.segment, moodType, tags, language, moodText);
+      if (result) {
+        console.log(`[content] Optimized flow succeeded for ${userId}`);
+        return { ...result, language };
+      }
+      console.log(`[content] Optimized flow: no passage/exegesis found, falling back`);
+    } catch (err) {
+      console.error(`[content] Optimized flow error, falling back:`, (err as Error).message);
     }
-    console.log(`[content] Optimized flow: no passage/exegesis found, falling back`);
-  } catch (err) {
-    console.error(`[content] Optimized flow error, falling back:`, (err as Error).message);
+  } else {
+    console.log(`[content] forceLegacy=true (env=${process.env.FORCE_LEGACY}, param=${forceLegacy}), skipping optimized flow`);
   }
 
   // Fallback to legacy full generation
