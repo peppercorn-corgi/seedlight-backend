@@ -92,8 +92,23 @@ export async function selectPassage(
     .slice(0, 50);
 
   if (candidates.length === 0) {
-    console.log(`[passage] No candidates found for tags=[${tags.join(",")}], excludeRefs=${excludeRefs.length}`);
-    return null;
+    // Fallback: ignore tags, pick any passage by importance (avoid recently used)
+    console.log(`[passage] No tag-matched candidates for tags=[${tags.join(",")}], trying untagged fallback`);
+    const fallbackRaw = await prisma.devotionalPassage.findMany({
+      where: excludeRefs.length > 0 ? { reference: { notIn: excludeRefs } } : {},
+      orderBy: { importance: "desc" },
+      take: 50,
+    });
+    const fallbackCandidates = fallbackRaw
+      .filter((c) => (c.verseEnd ?? c.verseStart) - c.verseStart + 1 <= MAX_VERSE_SPAN)
+      .slice(0, 20);
+    if (fallbackCandidates.length === 0) {
+      console.log(`[passage] No candidates at all (even untagged). excludeRefs=${excludeRefs.length}`);
+      return null;
+    }
+    const fb = fallbackCandidates[Math.floor(Math.random() * fallbackCandidates.length)];
+    console.log(`[passage] Untagged fallback: "${fb.reference}" (imp=${fb.importance}) from ${fallbackCandidates.length} candidates`);
+    return fb;
   }
 
   // Weighted random selection: importance × book category weight

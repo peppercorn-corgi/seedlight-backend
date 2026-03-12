@@ -166,6 +166,63 @@ export const MOOD_MAPPING: Record<string, readonly string[]> = {
     "patience", "restoration", "grace", "trust",
     "sovereignty", "courage",
   ],
+  sad: [
+    "sorrowful", "grieving", "heartbroken", "disappointed",
+    "lonely", "bitter",
+    "loss", "suffering",
+    "mercy", "restoration", "love", "patience", "covenant",
+  ],
+  overwhelmed: [
+    "overwhelmed", "exhausted", "desperate", "anxious",
+    "frustrated",
+    "work_stress", "suffering", "health",
+    "trust", "sovereignty", "patience", "grace", "prayer",
+  ],
+  peaceful: [
+    "peaceful", "content", "grateful", "hopeful",
+    "tender", "humble",
+    "worship", "trust", "grace", "creation", "freedom",
+    "sovereignty",
+  ],
+  angry: [
+    "angry", "frustrated", "resentful", "bitter",
+    "injustice", "betrayal", "conflict",
+    "forgiveness", "patience", "justice", "mercy",
+    "repentance", "love",
+  ],
+  fearful: [
+    "fearful", "anxious", "insecure", "desperate",
+    "doubtful",
+    "health", "death", "persecution", "spiritual_warfare",
+    "trust", "faith", "courage", "sovereignty", "prayer",
+  ],
+  guilty: [
+    "guilty", "ashamed", "regretful",
+    "temptation", "failure",
+    "forgiveness", "repentance", "grace", "mercy",
+    "redemption", "salvation", "freedom",
+  ],
+  hopeful: [
+    "hopeful", "joyful", "grateful", "peaceful",
+    "yearning",
+    "new_beginning", "waiting",
+    "faith", "trust", "salvation", "redemption",
+    "restoration", "purpose",
+  ],
+  doubtful: [
+    "doubtful", "confused", "insecure",
+    "frustrated",
+    "decision", "spiritual_warfare",
+    "faith", "trust", "wisdom", "sovereignty",
+    "identity", "purpose",
+  ],
+  grieving: [
+    "grieving", "sorrowful", "heartbroken", "lonely",
+    "desperate", "yearning",
+    "loss", "death", "suffering",
+    "mercy", "love", "restoration", "covenant",
+    "patience", "redemption",
+  ],
 };
 
 // ---------------------------------------------------------------------------
