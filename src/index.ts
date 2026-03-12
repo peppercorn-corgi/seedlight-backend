@@ -66,7 +66,7 @@ app.use("/api", globalLimiter);
 
 const llmLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 60,
+  limit: 10,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many requests, please slow down" },

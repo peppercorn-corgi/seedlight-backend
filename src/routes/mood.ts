@@ -15,7 +15,7 @@ const VALID_MOODS = [
 
 const moodSubmitSchema = z.object({
   moodType: z.enum(VALID_MOODS).optional(),
-  moodText: z.string().max(500).optional(),
+  moodText: z.string().min(2).max(500).optional(),
 }).refine((data) => data.moodType || data.moodText, {
   message: "Either moodType or moodText must be provided",
 });
