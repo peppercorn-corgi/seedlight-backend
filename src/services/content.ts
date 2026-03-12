@@ -22,39 +22,39 @@ function buildEnglishRef(passage: { book: string; chapter: number; verseStart: n
 // Mood daily-life context — helps the LLM understand the user's real situation
 // ---------------------------------------------------------------------------
 const MOOD_CONTEXT_ZH: Record<string, string> = {
-  anxious: "焦虑——可能来自工作压力、未来的不确定性、等待结果的煎熬、或对某件事的担忧",
-  sad: "难过——可能因为失去、失望、被误解、一段关系的变化、或一种说不清的低落感",
-  lonely: "孤独——可能是独处时的空虚感、在人群中的格格不入、想念某个人、或缺少被理解",
-  overwhelmed: "压力山大——事情太多喘不过气、工作生活失衡、不知道从哪里开始",
-  confused: "迷茫——面临重要选择、找不到人生方向、不知道该怎么做、质疑自己的决定",
-  exhausted: "疲惫——身心俱疲、感觉被掏空、想休息但停不下来、对很多事提不起劲",
-  angry: "愤怒——觉得不公平、被人伤害、对现状不满、或对自己的无能为力感到挫败",
-  grateful: "感恩——回想起值得感谢的人和事、感受到生活中的温暖和善意",
-  joyful: "喜乐——因为一件美好的事而开心、想要珍惜和分享这份快乐",
-  fearful: "恐惧——害怕失去重要的东西、害怕未知的将来、害怕自己不够好或承担不起",
-  guilty: "内疚——后悔做了某件事或没能做到某件事、觉得自己亏欠了谁、对自己感到失望",
-  hopeful: "盼望——虽然当下不完美，但心里有一种对未来的期待和向往",
-  peaceful: "平安——内心难得的安静，想要在这份平静中思考、沉淀、感受当下",
-  doubtful: "怀疑——对一些事情、信念、或自己的选择产生了质疑，不确定该相信什么",
-  grieving: "哀伤——正在经历失去或告别的痛苦，需要时间和空间来消化",
+  anxious: `焦虑——他们心里可能在想："如果这件事搞砸了怎么办？""我明明知道不该想这么多，但就是停不下来。""为什么别人看起来那么从容，只有我在慌？"焦虑的人往往不是不努力，恰恰是因为太在意、太负责，才把担忧背在身上放不下。他们需要的不是"别想太多"，而是有人看到他们一直在撑着。`,
+  sad: `难过——他们心里可能在想："为什么会变成这样？""我以为自己已经放下了，怎么还是这么难受？""好像没人真正理解我在经历什么。"难过的人常常表面上看起来没事，但心里有一块地方在隐隐地痛。他们需要的不是被开导，而是有人愿意安静地陪着，不急着让他们"好起来"。`,
+  lonely: `孤独——他们心里可能在想："身边明明有人，为什么还是觉得没人懂我？""我不想一个人扛了，但不知道该跟谁说。""我好像在人群里，却感觉自己是隐形的。"孤独不一定是身边没有人，而是找不到真正被理解的感觉。他们渴望的不是热闹，而是有人真正看见自己。`,
+  overwhelmed: `压力山大——他们心里可能在想："事情多到不知道从哪里开始。""所有人都在等我，可我已经快扛不住了。""我好想按暂停键，但世界不允许。"压力大的人最怕的往往不是事情本身，而是那种失控的感觉——好像不管怎么努力都追不上。他们需要有人告诉他们：你可以先停下来喘口气。`,
+  confused: `迷茫——他们心里可能在想："我到底该怎么选？""我不知道自己想要什么，这很可怕。""每个人都好像有方向，只有我在原地打转。"迷茫的人最痛苦的不是没有选择，而是害怕选错——害怕浪费时间、辜负期待、走上一条后悔的路。他们需要的不是答案，而是勇气。`,
+  exhausted: `疲惫——他们心里可能在想："我好累，但不敢停。""如果我倒下了，谁来撑？""我已经不记得上次因为什么开心了。"疲惫的人常常不是身体的累，而是心累——做了很多却看不到尽头，付出了很多却觉得不被看见。他们需要的不是更多建议，而是被允许说一句"我真的很累"。`,
+  angry: `愤怒——他们心里可能在想："凭什么？这明明不公平。""我已经忍了很久了。""我不是不讲理，我只是不想再被这样对待了。"愤怒的底下常常藏着伤痛——被忽视、被辜负、或者对自己无力改变现状的挫败。他们需要的不是被劝"消消气"，而是有人承认：你有权利生气，因为你在乎。`,
+  grateful: `感恩——他们可能刚经历了一份温暖——一个人的善意、一件事的转机、或者突然发现自己拥有的比想象中多。这份感恩里可能也带着一点感慨："这些美好是我不配得的"，或者"希望这样的时刻可以多一些"。他们希望把这份感动变成力量，不只是感受，更想回应。`,
+  joyful: `喜乐——他们可能正因为一件美好的事而由衷开心——一个好消息、一个等待终于有了结果、一段关系的温暖时刻。但喜乐中有时也会闪过一丝不安："这样的快乐能持续多久？"他们希望珍惜这份快乐，也希望有人一起分享这份美好。`,
+  fearful: `恐惧——他们心里可能在想："如果最坏的结果发生了怎么办？""我不确定自己能扛得住。""我不敢跟别人说我有多害怕。"恐惧让人缩起来，不是因为懦弱，而是因为要失去的东西太重要了。他们需要的不是"没事的"，而是有人陪他们一起面对那个"万一"。`,
+  guilty: `内疚——他们心里可能在想："都是我的错。""如果当时我做了不同的选择……""我怎么配得到别人的原谅？"内疚的人最残忍的审判者往往是自己。他们反复回放那个遗憾的瞬间，觉得自己不够好、做得不够多、或者伤害了不该伤害的人。他们需要的不是被审判，而是被告知：你已经尽力了，现在该放过自己了。`,
+  hopeful: `盼望——虽然当下不完美，但他们心里有一种对未来的期待和向往。也许是刚经历了低谷开始看到转机，也许是决定了要做某个改变。盼望里可能也带着一点忐忑："这次会不一样吗？"他们需要被坚固——让这份盼望不只是一时的情绪，而是扎根在更深的地方。`,
+  peaceful: `平安——内心难得的安静，想要在这份平静中思考、沉淀、感受当下。这份平安可能来之不易——也许是经历了风浪之后的宁静，也许是在忙碌中偶然找到的一个间隙。他们希望在这份安静中获得更深的领悟，让平安不只是片刻，而是生命的底色。`,
+  doubtful: `怀疑——他们心里可能在想："我以前相信的那些，真的对吗？""为什么别人那么笃定，我却总是动摇？""怀疑会不会说明我的信心有问题？"怀疑的人往往不是不想相信，而是太认真——他们不愿意稀里糊涂地活，想要弄清楚自己到底在相信什么。他们需要的不是被责备"你不该怀疑"，而是被允许带着问题寻找。`,
+  grieving: `哀伤——他们正在经历失去的痛苦——也许是一个人、一段关系、一个机会、或一个曾经以为会实现的梦。他们心里可能在想："为什么是我？""没有了它/他/她，我该怎么继续。""大家都说时间会治愈，但现在每一天都好难熬。"哀伤的人最不需要的是道理，最需要的是有人陪他们在黑暗中坐一会儿，不催、不劝，只是在。`,
 };
 
 const MOOD_CONTEXT_EN: Record<string, string> = {
-  anxious: "Anxious — may stem from work pressure, uncertainty about the future, waiting for results, or worry about something specific",
-  sad: "Sad — perhaps due to loss, disappointment, feeling misunderstood, a changing relationship, or an unexplainable low feeling",
-  lonely: "Lonely — could be emptiness when alone, feeling out of place in a crowd, missing someone, or lacking genuine connection",
-  overwhelmed: "Overwhelmed — too much on their plate, struggling to balance work and life, unsure where to start",
-  confused: "Confused — facing a big decision, unsure of their direction, questioning past choices",
-  exhausted: "Exhausted — physically and emotionally drained, running on empty, wanting to rest but unable to stop",
-  angry: "Angry — sensing injustice, feeling hurt by others, frustrated with circumstances, or upset at their own helplessness",
-  grateful: "Grateful — reflecting on people and moments worth appreciating, sensing warmth and kindness in life",
-  joyful: "Joyful — happy about something wonderful, wanting to cherish and share the feeling",
-  fearful: "Fearful — afraid of losing something important, afraid of the unknown, afraid of not being enough",
-  guilty: "Guilty — regretting something done or left undone, feeling they have let someone down",
-  hopeful: "Hopeful — though things aren't perfect, they sense anticipation and longing for what's ahead",
-  peaceful: "Peaceful — experiencing rare inner quiet, wanting to reflect and be present in the moment",
-  doubtful: "Doubtful — questioning beliefs, choices, or certainties they once held",
-  grieving: "Grieving — processing loss or saying goodbye, needing space and time to heal",
+  anxious: `Anxious — they may be thinking: "What if I mess this up?" "I know I shouldn't overthink, but I can't stop." "Everyone else seems so calm — why am I the only one panicking?" Anxious people aren't lazy or careless — they worry precisely because they care too much. What they need isn't "just relax" but someone who sees how hard they've been trying to hold it together.`,
+  sad: `Sad — they may be thinking: "Why did things turn out like this?" "I thought I was over it, but it still hurts." "No one really understands what I'm going through." Sad people often look fine on the outside while something inside quietly aches. They don't need to be cheered up — they need someone willing to sit with them without rushing them to "feel better."`,
+  lonely: `Lonely — they may be thinking: "I'm surrounded by people, so why do I still feel unseen?" "I'm tired of carrying this alone, but I don't know who to tell." "I feel invisible, even in a crowd." Loneliness isn't about being alone — it's about not feeling truly known. What they long for isn't company, but someone who genuinely sees them.`,
+  overwhelmed: `Overwhelmed — they may be thinking: "There's so much to do, I don't know where to start." "Everyone is counting on me, and I'm barely holding on." "I just want to press pause, but the world won't let me." What overwhelms people most isn't the workload itself but the feeling of losing control — no matter how hard they try, it's never enough. They need someone to say: it's okay to stop and breathe.`,
+  confused: `Confused — they may be thinking: "What should I do?" "I don't even know what I want, and that scares me." "Everyone else seems to have a direction — I'm just going in circles." The deepest pain of confusion isn't having no options — it's the fear of choosing wrong and wasting time, disappointing people, or walking a path they'll regret. What they need isn't answers but courage.`,
+  exhausted: `Exhausted — they may be thinking: "I'm so tired, but I can't stop." "If I collapse, who picks up the pieces?" "I can't even remember the last time I felt genuinely happy." Exhaustion often isn't physical — it's the weariness of giving so much without seeing the end, of pouring out without feeling seen. What they need isn't more advice but permission to say: "I'm really, really tired."`,
+  angry: `Angry — they may be thinking: "This isn't fair." "I've been holding it in for so long." "I'm not being unreasonable — I just refuse to be treated like this anymore." Beneath anger there is almost always pain — being overlooked, being let down, or the frustration of being powerless to change things. They don't need to be told to calm down — they need someone to say: "You have every right to feel this way, because you care."`,
+  grateful: `Grateful — they may have just experienced a moment of warmth — someone's kindness, a turning point, or the sudden realization that they have more than they thought. This gratitude may carry a quiet wonder: "I don't deserve this goodness," or "I wish moments like these came more often." They want to turn this feeling into something lasting — not just emotion, but response.`,
+  joyful: `Joyful — they may be genuinely happy about something wonderful — good news, a long-awaited answer, a warm moment in a relationship. But joy sometimes carries a whisper of unease: "How long can this last?" They want to hold onto this happiness and share it, knowing beautiful moments are worth savoring.`,
+  fearful: `Fearful — they may be thinking: "What if the worst actually happens?" "I'm not sure I can handle it." "I'm afraid to tell anyone how scared I really am." Fear makes people shrink — not because they're weak, but because what's at stake matters too much. They don't need "it'll be fine" — they need someone willing to face the "what if" alongside them.`,
+  guilty: `Guilty — they may be thinking: "It's all my fault." "If only I had made a different choice..." "How could anyone forgive me when I can't forgive myself?" The harshest judge of a guilty person is often themselves. They replay the regretted moment endlessly, feeling they weren't good enough or did too much harm. What they need isn't judgment but to hear: "You did your best. It's time to let yourself go."`,
+  hopeful: `Hopeful — though things aren't perfect, something inside them looks forward. Perhaps they're emerging from a valley, or they've decided to make a change. Hope may come with a quiet nervousness: "Will this time be different?" They need to be strengthened — so this hope doesn't stay a passing mood but takes root in something deeper.`,
+  peaceful: `Peaceful — a rare inner quiet, wanting to reflect and be present. This peace may have been hard-won — perhaps calm after a storm, or a pause found in the middle of busyness. They hope to gain deeper insight in this stillness, letting peace become not just a moment but the undertone of their life.`,
+  doubtful: `Doubtful — they may be thinking: "Is what I've always believed actually true?" "Why does everyone else seem so certain while I keep wavering?" "Does doubting mean something is wrong with my faith?" Doubters often aren't faithless — they're too honest to believe without thinking. They refuse to go through the motions and want to know what they actually stand on. They don't need "you shouldn't doubt" — they need permission to seek with their questions.`,
+  grieving: `Grieving — they are processing the pain of loss — perhaps a person, a relationship, an opportunity, or a dream they once believed would come true. They may be thinking: "Why me?" "I don't know how to keep going without them/it." "Everyone says time heals, but right now every day is unbearable." What grieving people need least is platitudes. What they need most is someone willing to sit with them in the dark — not rushing, not fixing, just being there.`,
 };
 
 // ---------------------------------------------------------------------------
@@ -291,6 +291,8 @@ function buildOptimizedSystemPrompt(segment: string, hasMoodText: boolean): stri
 2. 然后自然地将经文的智慧与他们的具体处境联系起来
 3. 以"陪伴者"而非"传道者"的姿态出现——不是给答案，而是一起看到亮光
 
+**关键：洞察用户的内心。**在写任何内容之前，先想一想：选了这个心情的人，内心最深处在挣扎什么？他们说不出口但最想被理解的是什么？然后让你的文字去触及那个没被说出来的地方——让他们觉得"你怎么知道我在想这个？"不要泛泛地安慰，要说中他们心里那个具体的痛点。
+
 ${HERMENEUTIC_ZH}
 
 我们的用户群体包括：尚未信主的慕道友、刚接触信仰的初信者、正在成长中的基督徒、以及成熟的信徒。你需要根据当前用户的信仰阶段调整语言和深度。
@@ -333,6 +335,8 @@ Your core task:
 1. First genuinely understand and empathize with the user's daily situation — make them feel heard
 2. Then naturally bridge from their real-life experience to the scripture's wisdom
 3. Show up as a companion, not a preacher — don't hand out answers, walk alongside them toward the light
+
+**Key: See beneath the surface.** Before writing anything, pause and consider: what is this person truly struggling with beneath this emotion? What can't they articulate but desperately want someone to understand? Then let your words reach that unspoken place — make them feel "how did you know that's exactly what I was thinking?" Don't offer generic comfort — name the specific ache in their heart.
 
 ${HERMENEUTIC_EN}
 
@@ -571,6 +575,8 @@ function buildLegacySystemPrompt(segment: string): string {
 2. 然后自然地将经文的智慧与他们的具体处境联系起来
 3. 以"陪伴者"而非"传道者"的姿态出现——不是给答案，而是一起看到亮光
 
+**关键：洞察用户的内心。**在写任何内容之前，先想一想：选了这个心情的人，内心最深处在挣扎什么？他们说不出口但最想被理解的是什么？然后让你的文字去触及那个没被说出来的地方——让他们觉得"你怎么知道我在想这个？"不要泛泛地安慰，要说中他们心里那个具体的痛点。
+
 ${HERMENEUTIC_ZH}
 
 我们的用户群体包括：尚未信主的慕道友、刚接触信仰的初信者、正在成长中的基督徒、以及成熟的信徒。你需要根据当前用户的信仰阶段调整语言和深度。
@@ -617,6 +623,8 @@ Your core task:
 1. First genuinely understand and empathize with the user's daily situation — make them feel heard
 2. Then naturally bridge from their real-life experience to the scripture's wisdom
 3. Show up as a companion, not a preacher — don't hand out answers, walk alongside them toward the light
+
+**Key: See beneath the surface.** Before writing anything, pause and consider: what is this person truly struggling with beneath this emotion? What can't they articulate but desperately want someone to understand? Then let your words reach that unspoken place — make them feel "how did you know that's exactly what I was thinking?" Don't offer generic comfort — name the specific ache in their heart.
 
 ${HERMENEUTIC_EN}
 
