@@ -299,7 +299,7 @@ ${personalLinkSection}${secularLinkGuide}
 
 ${covenantGuide}
 
-格式要求：每个部分写成一段话，不要分成多个段落。在每段文字中，将最有启发性、最能触动人心的1-2句话用 **加粗标记** 包裹（如"**这句话会被高亮**"）。高亮的应该是读者最想带走的核心洞见或安慰。段落之间用\\n\\n分隔。
+格式要求：每个部分写成一段话，不要分成多个段落。在每段文字中，用 **加粗标记** 包裹1-2句最触动心灵的话（如"**这句话会被高亮**"）。高亮的必须是直接给人安慰、温暖或力量的句子——那种让人想停下来反复品味的话，而不是分析性、比较性或知识性的观点。段落之间用\\n\\n分隔。
 
 以JSON格式返回：${jsonFormat}
 只返回JSON，不要包含markdown代码块标记。`;
@@ -342,7 +342,7 @@ ${personalLinkSection}${secularLinkGuide}
 
 ${covenantGuide}
 
-Format: write each section as a single paragraph. Within each paragraph, wrap the 1-2 most insightful or moving sentences in **bold markers** (e.g., "**this sentence will be highlighted**"). The highlighted portions should be the core insight or comfort the reader most wants to take away. Separate sections with \\n\\n.
+Format: write each section as a single paragraph. Within each paragraph, wrap 1-2 sentences in **bold markers** (e.g., "**this sentence will be highlighted**"). The highlighted text must be sentences that directly comfort, warm, or empower the reader — the kind of words that make someone pause and feel seen. Do NOT highlight analytical comparisons or intellectual observations. Separate sections with \\n\\n.
 
 Return as JSON: ${jsonFormat}
 Return only the JSON — no markdown code block markers.`;
@@ -566,7 +566,7 @@ ${secularLinkGuide}
 
 ${covenantGuide}
 
-格式要求：每个部分写成一段话，不要分成多个段落。在每段文字中，将最有启发性、最能触动人心的1-2句话用 **加粗标记** 包裹（如"**这句话会被高亮**"）。高亮的应该是读者最想带走的核心洞见或安慰。段落之间用\\n\\n分隔。
+格式要求：每个部分写成一段话，不要分成多个段落。在每段文字中，用 **加粗标记** 包裹1-2句最触动心灵的话（如"**这句话会被高亮**"）。高亮的必须是直接给人安慰、温暖或力量的句子——那种让人想停下来反复品味的话，而不是分析性、比较性或知识性的观点。段落之间用\\n\\n分隔。
 
 你必须以JSON格式返回，包含以下字段：
 - scriptureRef: 经文引用，格式如 "腓立比书 4:6-7"（使用中文书卷名）
@@ -616,7 +616,7 @@ ${secularLinkGuide}
 
 ${covenantGuide}
 
-Format: write each section as a single paragraph. Within each paragraph, wrap the 1-2 most insightful or moving sentences in **bold markers** (e.g., "**this sentence will be highlighted**"). The highlighted portions should be the core insight or comfort the reader most wants to take away. Separate sections with \\n\\n.
+Format: write each section as a single paragraph. Within each paragraph, wrap 1-2 sentences in **bold markers** (e.g., "**this sentence will be highlighted**"). The highlighted text must be sentences that directly comfort, warm, or empower the reader — the kind of words that make someone pause and feel seen. Do NOT highlight analytical comparisons or intellectual observations. Separate sections with \\n\\n.
 
 You must return a JSON object with the following fields:
 - scriptureRef: the scripture reference, e.g. "Philippians 4:6-7"
