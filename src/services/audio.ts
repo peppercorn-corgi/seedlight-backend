@@ -68,8 +68,9 @@ async function synthesize(text: string, language: string): Promise<Buffer> {
  * Generate TTS audio for a ContentCard and save as MP3.
  * Returns the audio URL path, or null if generation fails.
  */
-export async function generateAudio(contentCardId: string): Promise<string | null> {
-  if (generating.has(contentCardId)) return null;
+export async function generateAudio(contentCardId: string, lang?: string): Promise<string | null> {
+  const cacheKey = lang === "en" ? `${contentCardId}_en` : contentCardId;
+  if (generating.has(cacheKey)) return null;
 
   const card = await prisma.contentCard.findUnique({
     where: { id: contentCardId },
@@ -79,15 +80,40 @@ export async function generateAudio(contentCardId: string): Promise<string | nul
     throw new Error(`ContentCard not found: ${contentCardId}`);
   }
 
-  const text = buildTtsText(card);
-  const audioPath = path.join(AUDIO_DIR, `${contentCardId}.mp3`);
+  let text: string;
+  let ttsLang: string;
 
-  generating.add(contentCardId);
+  if (lang === "en") {
+    // Use translated content for English audio
+    const translation = await prisma.contentCardTranslation.findUnique({
+      where: { contentCardId_language: { contentCardId, language: "en" } },
+    });
+    if (!translation) {
+      throw new Error(`No English translation found for ${contentCardId}. Translate first.`);
+    }
+    text = buildTtsText({
+      scriptureRef: translation.scriptureRef,
+      scriptureZh: card.scriptureZh,
+      scriptureEn: card.scriptureEn,
+      exegesis: translation.exegesis,
+      secularLink: translation.secularLink,
+      covenant: translation.covenant,
+      language: "en",
+    });
+    ttsLang = "en";
+  } else {
+    text = buildTtsText(card);
+    ttsLang = card.language;
+  }
+
+  const audioPath = path.join(AUDIO_DIR, `${cacheKey}.mp3`);
+
+  generating.add(cacheKey);
   try {
     let buf: Buffer | null = null;
     for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
       try {
-        buf = await synthesize(text, card.language);
+        buf = await synthesize(text, ttsLang);
         break;
       } catch (err) {
         console.error(`[audio] TTS attempt ${attempt}/${TTS_MAX_RETRIES} failed:`, (err as Error).message);
@@ -100,36 +126,41 @@ export async function generateAudio(contentCardId: string): Promise<string | nul
       fs.writeFileSync(audioPath, buf);
     }
 
-    const audioUrl = `/api/audio/${contentCardId}`;
-    await prisma.contentCard.update({
-      where: { id: contentCardId },
-      data: { audioUrl },
-    });
+    // Only update card audioUrl for original language
+    if (lang !== "en") {
+      const audioUrl = `/api/audio/${contentCardId}`;
+      await prisma.contentCard.update({
+        where: { id: contentCardId },
+        data: { audioUrl },
+      });
+    }
 
-    console.log(`[audio] Generated audio for ${contentCardId}`);
-    return audioUrl;
+    console.log(`[audio] Generated ${ttsLang} audio for ${cacheKey}`);
+    return `/api/audio/${contentCardId}${lang === "en" ? "?lang=en" : ""}`;
   } catch (err) {
-    console.error(`[audio] TTS generation failed for ${contentCardId}:`, (err as Error).message);
+    console.error(`[audio] TTS generation failed for ${cacheKey}:`, (err as Error).message);
     if (fs.existsSync(audioPath)) {
       fs.unlinkSync(audioPath);
     }
     return null;
   } finally {
-    generating.delete(contentCardId);
+    generating.delete(cacheKey);
   }
 }
 
 /**
  * Check whether audio is currently being generated for a card.
  */
-export function isAudioGenerating(contentCardId: string): boolean {
-  return generating.has(contentCardId);
+export function isAudioGenerating(contentCardId: string, lang?: string): boolean {
+  const cacheKey = lang === "en" ? `${contentCardId}_en` : contentCardId;
+  return generating.has(cacheKey);
 }
 
 /**
  * Get the file path for a content card's audio, or null if not generated.
  */
-export function getAudioFilePath(contentCardId: string): string | null {
-  const audioPath = path.join(AUDIO_DIR, `${contentCardId}.mp3`);
+export function getAudioFilePath(contentCardId: string, lang?: string): string | null {
+  const cacheKey = lang === "en" ? `${contentCardId}_en` : contentCardId;
+  const audioPath = path.join(AUDIO_DIR, `${cacheKey}.mp3`);
   return fs.existsSync(audioPath) ? audioPath : null;
 }

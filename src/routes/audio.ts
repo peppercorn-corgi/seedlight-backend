@@ -8,27 +8,28 @@ const router = Router();
 // Validate contentCardId is a safe CUID (no path traversal)
 const CUID_RE = /^[a-z0-9]{20,30}$/;
 
-// GET /api/audio/:contentCardId - serve audio file
+// GET /api/audio/:contentCardId - serve audio file (?lang=en for English)
 router.get("/:contentCardId", requireAuth, (req, res, next) => {
   try {
     const contentCardId = req.params.contentCardId as string;
+    const lang = (req.query.lang as string) || undefined;
 
     if (!CUID_RE.test(contentCardId)) {
       res.status(400).json({ error: "Invalid content card ID" });
       return;
     }
 
-    if (isAudioGenerating(contentCardId)) {
+    if (isAudioGenerating(contentCardId, lang)) {
       res.status(202).json({ status: "generating" });
       return;
     }
 
-    const filePath = getAudioFilePath(contentCardId);
+    const filePath = getAudioFilePath(contentCardId, lang);
 
     if (!filePath) {
       // Trigger on-demand generation
-      generateAudio(contentCardId).catch((err) =>
-        console.error(`[audio] On-demand generation failed for ${contentCardId}:`, err),
+      generateAudio(contentCardId, lang).catch((err) =>
+        console.error(`[audio] On-demand generation failed for ${contentCardId} (lang=${lang}):`, err),
       );
       res.status(202).json({ status: "generating" });
       return;
@@ -69,17 +70,18 @@ router.get("/:contentCardId", requireAuth, (req, res, next) => {
   }
 });
 
-// POST /api/audio/:contentCardId/generate - trigger audio generation
+// POST /api/audio/:contentCardId/generate - trigger audio generation (?lang=en for English)
 router.post("/:contentCardId/generate", requireAuth, async (req, res, next) => {
   try {
     const contentCardId = req.params.contentCardId as string;
+    const lang = (req.query.lang as string) || undefined;
 
     if (!CUID_RE.test(contentCardId)) {
       res.status(400).json({ error: "Invalid content card ID" });
       return;
     }
 
-    const audioUrl = await generateAudio(contentCardId);
+    const audioUrl = await generateAudio(contentCardId, lang);
 
     if (!audioUrl) {
       res.status(500).json({ error: "Audio generation failed" });

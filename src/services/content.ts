@@ -478,7 +478,9 @@ function extractKeyValues<K extends string>(cleaned: string, keys: readonly K[])
       }
     }
 
-    result[key] = cleaned.slice(valueStart, valueEnd);
+    result[key] = cleaned.slice(valueStart, valueEnd)
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, "\\");
   }
   return result;
 }

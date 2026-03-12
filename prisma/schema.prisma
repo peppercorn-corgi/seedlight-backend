@@ -59,8 +59,24 @@ model ContentCard {
   createdAt    DateTime @default(now())
   feedbacks    Feedback[]
   pushLogs     PushLog[]
+  translations ContentCardTranslation[]
 
   @@map("content_cards")
+}
+
+model ContentCardTranslation {
+  id            String      @id @default(cuid())
+  contentCardId String
+  contentCard   ContentCard @relation(fields: [contentCardId], references: [id])
+  language      String      // target language: "en"
+  scriptureRef  String      // translated reference
+  exegesis      String
+  secularLink   String
+  covenant      String
+  createdAt     DateTime    @default(now())
+
+  @@unique([contentCardId, language])
+  @@map("content_card_translations")
 }
 
 model Feedback {

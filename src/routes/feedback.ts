@@ -95,6 +95,29 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
   }
 });
 
+// GET /api/feedback/status/:contentCardId - get user's like/save status for a card
+router.get("/status/:contentCardId", requireAuth, async (req, res, next) => {
+  try {
+    const contentCardId = req.params.contentCardId as string;
+    const user = await resolveUser(req.user!.sub);
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const feedbacks = await prisma.feedback.findMany({
+      where: { contentCardId, userId: user.id, type: { in: ["like", "save"] } },
+      select: { id: true, type: true },
+    });
+
+    const like = feedbacks.find((f) => f.type === "like");
+    const save = feedbacks.find((f) => f.type === "save");
+    res.json({ likeId: like?.id ?? null, saveId: save?.id ?? null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
   offset: z.coerce.number().int().min(0).default(0),
@@ -120,13 +143,17 @@ router.get("/saved", requireAuth, async (req, res, next) => {
       prisma.feedback.findMany({
         where: {
           userId: user.id,
-          type: { in: ["like", "save"] },
+          type: "save",
         },
         include: {
           contentCard: {
             include: {
               moodEntry: {
                 select: { moodType: true, moodText: true, createdAt: true },
+              },
+              feedbacks: {
+                where: { userId: user.id, type: { in: ["like", "save"] } },
+                select: { id: true, type: true },
               },
             },
           },
@@ -138,12 +165,22 @@ router.get("/saved", requireAuth, async (req, res, next) => {
       prisma.feedback.count({
         where: {
           userId: user.id,
-          type: { in: ["like", "save"] },
+          type: "save",
         },
       }),
     ]);
 
-    res.json({ data: feedbacks, total, limit, offset });
+    // Flatten: inject likeId/saveId into contentCard, strip nested feedbacks
+    const data = feedbacks.map(({ contentCard: { feedbacks: fbs, ...card }, ...fb }) => ({
+      ...fb,
+      contentCard: {
+        ...card,
+        likeId: fbs.find((f) => f.type === "like")?.id ?? null,
+        saveId: fbs.find((f) => f.type === "save")?.id ?? null,
+      },
+    }));
+
+    res.json({ data, total, limit, offset });
   } catch (err) {
     next(err);
   }
