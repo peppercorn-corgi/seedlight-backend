@@ -682,7 +682,8 @@ interface FullAiResponse {
 
 function parseFullResponse(text: string): FullAiResponse {
   const cleaned = text.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
-  const required = ["scriptureRef", "scriptureZh", "scriptureEn", "exegesis", "secularLink", "covenant"] as const;
+  // scriptureEn/scriptureZh are optional here — they get filled from DB later (lines 752-754)
+  const required = ["scriptureRef", "exegesis", "secularLink", "covenant"] as const;
 
   const validate = (o: unknown): o is FullAiResponse =>
     !!o && required.every((k) => typeof (o as Record<string, unknown>)[k] === "string"
@@ -746,7 +747,11 @@ async function generateLegacy(
   console.log("[LLM:legacy] Raw:\n" + response.text);
   const aiResult = parseFullResponse(response.text);
 
-  // Verify scripture reference in DB
+  // Ensure scripture text fields exist (LLM may omit them)
+  if (!aiResult.scriptureZh) aiResult.scriptureZh = "";
+  if (!aiResult.scriptureEn) aiResult.scriptureEn = "";
+
+  // Verify scripture reference in DB and fill authoritative text
   const dbScripture = await findByReference(aiResult.scriptureRef);
   const verified = dbScripture !== null;
   if (dbScripture) {
