@@ -419,12 +419,29 @@ function parsePartialResponse(text: string, hasMoodText: boolean): PartialAiResp
  * Handles LLM output with keys in any order and unescaped quotes in values.
  */
 function extractKeyValues<K extends string>(cleaned: string, keys: readonly K[]): Record<K, string> {
-  // Find all key positions (order-independent)
+  // Alias map: LLM sometimes uses variant field names
+  const ALIASES: Record<string, string[]> = {
+    secularLink: ["secularLink", "secular_link", "culturalConnection", "cultural_connection"],
+    covenant: ["covenant", "covenantResponsibility", "covenant_responsibility"],
+    exegesis: ["exegesis", "scripture_exegesis", "scriptureExegesis"],
+    personalLink: ["personalLink", "personal_link"],
+    scriptureRef: ["scriptureRef", "scripture_ref", "reference"],
+  };
+
+  // Find all key positions (order-independent, with alias fallback)
   const found: Array<{ key: K; patternStart: number; valueStart: number }> = [];
   for (const key of keys) {
-    const m = cleaned.match(new RegExp(`"${key}"\\s*:\\s*"`));
-    if (!m || m.index === undefined) throw new Error(`Missing field: ${key}`);
-    found.push({ key, patternStart: m.index, valueStart: m.index + m[0].length });
+    const variants = ALIASES[key] || [key];
+    let matched = false;
+    for (const variant of variants) {
+      const m = cleaned.match(new RegExp(`"${variant}"\\s*:\\s*"`));
+      if (m && m.index !== undefined) {
+        found.push({ key, patternStart: m.index, valueStart: m.index + m[0].length });
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) throw new Error(`Missing field: ${key}`);
   }
   found.sort((a, b) => a.patternStart - b.patternStart);
 
