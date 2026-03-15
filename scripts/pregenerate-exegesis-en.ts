@@ -14,6 +14,8 @@
  *   npx tsx scripts/pregenerate-exegesis-en.ts --limit 100          # process N passages
  *   npx tsx scripts/pregenerate-exegesis-en.ts --concurrency 5      # 5 parallel workers
  *   npx tsx scripts/pregenerate-exegesis-en.ts --dry-run            # preview only
+ *   npx tsx scripts/pregenerate-exegesis-en.ts --start-hour 0 --end-hour 6        # only run 00:00-06:00
+ *   npx tsx scripts/pregenerate-exegesis-en.ts --start-hour 22 --end-hour 6       # cross-midnight: 22:00-06:00
  */
 
 import { spawn } from "node:child_process";
@@ -57,8 +59,27 @@ const LIMIT = args.includes("--limit")
 const CONCURRENCY = args.includes("--concurrency")
   ? parseInt(args[args.indexOf("--concurrency") + 1], 10)
   : 1;
+const START_HOUR = args.includes("--start-hour")
+  ? parseInt(args[args.indexOf("--start-hour") + 1], 10)
+  : null;
+const END_HOUR = args.includes("--end-hour")
+  ? parseInt(args[args.indexOf("--end-hour") + 1], 10)
+  : null;
+const HAS_TIME_WINDOW = START_HOUR !== null && END_HOUR !== null;
 
 const SEGMENTS = ["seeker", "new_believer", "growing", "mature"] as const;
+
+// ---------------------------------------------------------------------------
+// Time window check (supports cross-midnight, e.g. 22:00-06:00)
+// ---------------------------------------------------------------------------
+function isWithinTimeWindow(): boolean {
+  if (!HAS_TIME_WINDOW) return true;
+  const hour = new Date().getHours();
+  if (START_HOUR! <= END_HOUR!) {
+    return hour >= START_HOUR! && hour < END_HOUR!;
+  }
+  return hour >= START_HOUR! || hour < END_HOUR!;
+}
 
 // ---------------------------------------------------------------------------
 // Claude CLI wrapper
@@ -227,7 +248,18 @@ async function main() {
   log(`=== pregenerate-exegesis-en started ===`);
   log(`  Dry run: ${DRY_RUN}, Resume: ${RESUME}`);
   log(`  Min importance: ${MIN_IMPORTANCE}, Limit: ${LIMIT || "none"}`);
+  log(`  Time window: ${HAS_TIME_WINDOW ? `${START_HOUR}:00-${END_HOUR}:00` : "none"}`);
   log(`  Log file: ${LOG_FILE}`);
+
+  if (HAS_TIME_WINDOW && !isWithinTimeWindow()) {
+    log(`  ⏳ Current hour (${new Date().getHours()}) is outside time window ${START_HOUR}:00-${END_HOUR}:00. Waiting...`);
+    while (!isWithinTimeWindow()) {
+      const now = new Date();
+      log(`  ⏳ ${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")} — still outside window, next check in 5min`);
+      await new Promise((r) => setTimeout(r, 5 * 60 * 1000));
+    }
+    log(`  ✓ Time window reached (hour=${new Date().getHours()}). Starting.`);
+  }
 
   const where: Record<string, unknown> = {};
   if (MIN_IMPORTANCE > 1) {
@@ -305,8 +337,15 @@ async function main() {
     }
   }
 
+  let stoppedByTimeWindow = false;
   const active = new Set<Promise<void>>();
   for (let i = 0; i < passages.length; i++) {
+    if (HAS_TIME_WINDOW && !isWithinTimeWindow()) {
+      log(`  ⏰ Time window ended (hour=${new Date().getHours()}). Stopping.`);
+      stoppedByTimeWindow = true;
+      break;
+    }
+
     const task = worker(passages[i], i).finally(() => active.delete(task));
     active.add(task);
 
@@ -317,7 +356,7 @@ async function main() {
   await Promise.allSettled(active);
 
   const totalMin = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
-  log(`=== pregenerate-exegesis-en done (${totalMin} min) ===`);
+  log(`=== pregenerate-exegesis-en ${stoppedByTimeWindow ? "stopped (time window)" : "done"} (${totalMin} min) ===`);
   log(`  Processed: ${processed}, Errors: ${errors}`);
 
   if (!DRY_RUN) {
