@@ -21,6 +21,8 @@ import feedbackRouter from "./routes/feedback.js";
 import userRouter from "./routes/user.js";
 import eventsRouter from "./routes/events.js";
 import userFeedbackRouter from "./routes/user-feedback.js";
+import pushRouter from "./routes/push.js";
+import { startPushScheduler } from "./cron/push-scheduler.js";
 
 const app = express();
 
@@ -98,6 +100,7 @@ app.use("/api/feedback", feedbackRouter);
 app.use("/api/user", userRouter);
 app.use("/api/events", eventsRouter);
 app.use("/api/user-feedback", userFeedbackRouter);
+app.use("/api/push", pushRouter);
 
 // ---------------------------------------------------------------------------
 // Error handler
@@ -121,6 +124,7 @@ app.use(
 // ---------------------------------------------------------------------------
 app.listen(config.PORT, () => {
   console.log(`[seedlight] Server running on port ${config.PORT} (${config.NODE_ENV})`);
+  startPushScheduler();
 });
 
 export default app;

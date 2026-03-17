@@ -102,8 +102,55 @@ async function activeUsers() {
   console.log(`  DAU (24h): ${dau.length}`);
   console.log(`  WAU (7d):  ${wau.length}`);
   console.log(`  MAU (30d): ${mau.length}`);
+  if (wau.length > 0) {
+    console.log(`  DAU/WAU ratio: ${(dau.length / wau.length * 100).toFixed(1)}%`);
+  }
   if (mau.length > 0) {
+    console.log(`  WAU/MAU ratio: ${(wau.length / mau.length * 100).toFixed(1)}%`);
     console.log(`  DAU/MAU ratio: ${(dau.length / mau.length * 100).toFixed(1)}%`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 2b. Today's Active Users (by email)
+// ---------------------------------------------------------------------------
+async function todayActiveUsers() {
+  heading("Today's Active Users");
+
+  // "Today" in Pacific/Auckland
+  const todayUsers = await prisma.$queryRaw<
+    Array<{ email: string | null; mood_count: number; first_at: string }>
+  >`
+    SELECT
+      u.email,
+      count(*)::int as mood_count,
+      min(me."createdAt" AT TIME ZONE 'Pacific/Auckland')::text as first_at
+    FROM mood_entries me
+    JOIN users u ON u.id = me."userId"
+    WHERE (me."createdAt" AT TIME ZONE 'Pacific/Auckland')::date
+        = (now() AT TIME ZONE 'Pacific/Auckland')::date
+    GROUP BY u.id, u.email
+    ORDER BY mood_count DESC, first_at ASC
+  `;
+
+  if (todayUsers.length === 0) {
+    console.log("  (no active users today)");
+    return;
+  }
+
+  const TOP_N = 20;
+  const shown = todayUsers.slice(0, TOP_N);
+  console.log(`  Total today: ${todayUsers.length} users\n`);
+  console.log(`  ${"Email".padEnd(35)} Moods  First Active`);
+  console.log(`  ${"─".repeat(35)} ${"─".repeat(5)}  ${"─".repeat(19)}`);
+  for (const u of shown) {
+    const email = (u.email ?? "(no email)").padEnd(35);
+    const count = String(u.mood_count).padStart(5);
+    const time = u.first_at.substring(0, 19); // trim to YYYY-MM-DD HH:MM:SS
+    console.log(`  ${email} ${count}  ${time}`);
+  }
+  if (todayUsers.length > TOP_N) {
+    console.log(`  ... and ${todayUsers.length - TOP_N} more`);
   }
 }
 
@@ -202,7 +249,7 @@ async function usageTimeDistribution() {
 
   const hours = await prisma.$queryRaw<Array<{ hour: number; cnt: number }>>`
     SELECT
-      extract(hour from "createdAt" AT TIME ZONE 'Asia/Shanghai')::int as hour,
+      extract(hour from "createdAt" AT TIME ZONE 'Pacific/Auckland')::int as hour,
       count(*)::int as cnt
     FROM mood_entries
     WHERE "createdAt" >= ${since}
@@ -227,7 +274,7 @@ async function usageDayOfWeek() {
 
   const days = await prisma.$queryRaw<Array<{ dow: number; cnt: number }>>`
     SELECT
-      extract(dow from "createdAt" AT TIME ZONE 'Asia/Shanghai')::int as dow,
+      extract(dow from "createdAt" AT TIME ZONE 'Pacific/Auckland')::int as dow,
       count(*)::int as cnt
     FROM mood_entries
     WHERE "createdAt" >= ${since}
@@ -264,11 +311,87 @@ async function shareFunnel() {
     },
   });
 
-  console.log(`  Content generated: ${contentViews}`);
-  console.log(`  Share actions: ${shareClicks} (${contentViews ? (shareClicks / contentViews * 100).toFixed(1) : 0}% of views)`);
-  console.log(`  Shared page views: ${sharedPageViews}`);
+  const ctaClicks = await prisma.analyticsEvent.count({
+    where: { event: "share_cta_click", createdAt: { gte: since } },
+  });
+  const conversions = await prisma.analyticsEvent.count({
+    where: { event: "share_conversion", createdAt: { gte: since } },
+  });
+
+  console.log(`  Content generated:   ${contentViews}`);
+  console.log(`  Share actions:       ${shareClicks} (${contentViews ? (shareClicks / contentViews * 100).toFixed(1) : 0}% of views)`);
+  console.log(`  Shared page views:   ${sharedPageViews}`);
+  console.log(`  CTA clicks:          ${ctaClicks} (${sharedPageViews ? (ctaClicks / sharedPageViews * 100).toFixed(1) : 0}% of views)`);
+  console.log(`  Registrations:       ${conversions} (${ctaClicks ? (conversions / ctaClicks * 100).toFixed(1) : 0}% of CTA)`);
+  console.log();
+  console.log("  Funnel: share → view → CTA → register");
   if (shareClicks > 0) {
-    console.log(`  Share → View conversion: ${(sharedPageViews / shareClicks * 100).toFixed(1)}%`);
+    console.log(`    ${shareClicks} → ${sharedPageViews} → ${ctaClicks} → ${conversions}`);
+    console.log(`    Overall: ${(conversions / shareClicks * 100).toFixed(1)}% share-to-register`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 8b. Top Sharers & Their Share Views
+// ---------------------------------------------------------------------------
+async function topSharers() {
+  heading("Top Sharers");
+
+  // Get top sharers with share counts
+  const sharers = await prisma.$queryRaw<
+    Array<{ user_id: string; email: string | null; share_count: number }>
+  >`
+    SELECT
+      ae."userId" as user_id,
+      u.email,
+      count(*)::int as share_count
+    FROM analytics_events ae
+    JOIN users u ON u.id = ae."userId"
+    WHERE ae.event IN ('share_link', 'share_image')
+      AND ae."createdAt" >= ${since}
+      AND ae."userId" IS NOT NULL
+    GROUP BY ae."userId", u.email
+    ORDER BY share_count DESC
+    LIMIT 15
+  `;
+
+  if (sharers.length === 0) {
+    console.log("  (no shares in this period)");
+    return;
+  }
+
+  // For each sharer, find how many views their shared content received
+  for (const s of sharers) {
+    // Get all contentCardIds this user shared
+    const sharedCards = await prisma.$queryRaw<Array<{ card_id: string }>>`
+      SELECT DISTINCT ae.data->>'contentCardId' as card_id
+      FROM analytics_events ae
+      WHERE ae."userId" = ${s.user_id}
+        AND ae.event IN ('share_link', 'share_image')
+        AND ae."createdAt" >= ${since}
+        AND ae.data->>'contentCardId' IS NOT NULL
+    `;
+
+    const cardIds = sharedCards.map((c) => c.card_id).filter(Boolean);
+
+    // Count page_view events on those shared cards
+    let viewCount = 0;
+    if (cardIds.length > 0) {
+      const views = await prisma.$queryRaw<[{ cnt: number }]>`
+        SELECT count(*)::int as cnt
+        FROM analytics_events
+        WHERE event = 'page_view'
+          AND data->>'page' = 'shared'
+          AND data->>'contentCardId' = ANY(${cardIds})
+          AND "createdAt" >= ${since}
+      `;
+      viewCount = views[0].cnt;
+    }
+
+    const email = (s.email ?? "(no email)").padEnd(35);
+    console.log(
+      `  ${email} shares=${String(s.share_count).padStart(3)}  views=${String(viewCount).padStart(4)}  cards=${String(cardIds.length).padStart(3)}`
+    );
   }
 }
 
@@ -383,12 +506,14 @@ async function main() {
 
   await userOverview();
   await activeUsers();
+  await todayActiveUsers();
   await moodDistribution();
   await usageTimeDistribution();
   await usageDayOfWeek();
   await contentEngagement();
   await topScriptures();
   await shareFunnel();
+  await topSharers();
   await eventsSummary();
   await pregenProgress();
   await retention();

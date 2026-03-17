@@ -18,8 +18,9 @@ model User {
   segment        String   @default("seeker") // seeker, new_believer, growing, mature
   onboarded      Boolean  @default(false)
   pushChannels   Json     @default("[]") // ["wechat:xxx", "email:a@b.com"]
-  timezone       String   @default("Asia/Shanghai")
+  timezone       String   @default("Pacific/Auckland")
   language       String   @default("zh") // zh, en, both
+  pushTime       String   @default("08:00") // local time HH:MM for daily push
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   moodEntries    MoodEntry[]
@@ -171,6 +172,18 @@ model UserFeedback {
 
   @@index([createdAt])
   @@map("user_feedbacks")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model AnalyticsEvent {

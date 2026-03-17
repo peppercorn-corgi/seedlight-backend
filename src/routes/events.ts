@@ -9,7 +9,7 @@ const router = Router();
 const VALID_EVENTS = [
   "mood_submit", "content_view", "share_link", "share_image",
   "save", "unsave", "like", "unlike", "audio_play", "copy_verse",
-  "page_view", "translate_card",
+  "page_view", "translate_card", "share_cta_click", "share_conversion",
 ] as const;
 
 const eventSchema = z.object({

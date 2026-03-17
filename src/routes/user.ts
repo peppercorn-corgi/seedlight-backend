@@ -9,11 +9,12 @@ const VALID_FAITH_LEVELS = ["seeker", "new_believer", "growing", "mature"] as co
 
 const VALID_LANGUAGES = ["zh", "en", "both"] as const;
 
+const pushTimeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 const preferencesSchema = z.object({
   faithLevel: z.enum(VALID_FAITH_LEVELS).optional(),
   language: z.enum(VALID_LANGUAGES).optional(),
-}).refine((data) => data.faithLevel || data.language, {
-  message: "At least one of faithLevel or language is required",
+  pushTime: z.string().regex(pushTimeRegex, "Must be HH:MM format").optional(),
 });
 
 // GET /api/user/preferences
@@ -21,7 +22,7 @@ router.get("/preferences", requireAuth, async (req, res, next) => {
   try {
     const user = await prisma.user.findFirst({
       where: { authProviderId: req.user!.sub },
-      select: { segment: true, language: true, onboarded: true },
+      select: { segment: true, language: true, onboarded: true, pushTime: true },
     });
 
     if (!user) {
@@ -29,7 +30,7 @@ router.get("/preferences", requireAuth, async (req, res, next) => {
       return;
     }
 
-    res.json({ faithLevel: user.segment, language: user.language, onboarded: user.onboarded });
+    res.json({ faithLevel: user.segment, language: user.language, onboarded: user.onboarded, pushTime: user.pushTime });
   } catch (err) {
     next(err);
   }
@@ -61,17 +62,21 @@ router.put("/preferences", requireAuth, async (req, res, next) => {
     if (parsed.data.language) {
       updateData.language = parsed.data.language;
     }
+    if (parsed.data.pushTime) {
+      updateData.pushTime = parsed.data.pushTime;
+    }
 
     const updated = await prisma.user.update({
       where: { id: user.id },
       data: updateData,
-      select: { segment: true, language: true, onboarded: true },
+      select: { segment: true, language: true, onboarded: true, pushTime: true },
     });
 
     res.json({
       faithLevel: updated.segment,
       language: updated.language,
       onboarded: updated.onboarded,
+      pushTime: updated.pushTime,
     });
   } catch (err) {
     next(err);
