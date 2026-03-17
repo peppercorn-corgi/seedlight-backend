@@ -22,6 +22,7 @@ import userRouter from "./routes/user.js";
 import eventsRouter from "./routes/events.js";
 import userFeedbackRouter from "./routes/user-feedback.js";
 import pushRouter from "./routes/push.js";
+import devotionalRouter from "./routes/devotional.js";
 import { startPushScheduler } from "./cron/push-scheduler.js";
 
 const app = express();
@@ -101,6 +102,7 @@ app.use("/api/user", userRouter);
 app.use("/api/events", eventsRouter);
 app.use("/api/user-feedback", userFeedbackRouter);
 app.use("/api/push", pushRouter);
+app.use("/api/devotional", llmLimiter, devotionalRouter);
 
 // ---------------------------------------------------------------------------
 // Error handler

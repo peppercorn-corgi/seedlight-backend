@@ -150,22 +150,23 @@ router.post("/test", requireAuth, async (req, res, next) => {
       return;
     }
 
-    // Pick a random passage for the test
+    // Pick a random passage for the test — include ID for devotional deep-link
     const count = await prisma.devotionalPassage.count();
     const passage = count > 0
       ? await prisma.devotionalPassage.findFirst({
           skip: Math.floor(Math.random() * count),
-          select: { reference: true, textZh: true, textEn: true },
+          select: { id: true, reference: true, textZh: true, textEn: true },
         })
       : null;
 
     const isEn = user.language === "en";
+    const url = passage ? `/?devotional=${passage.id}` : "/";
     const payload = JSON.stringify({
       title: isEn ? "Today's Scripture" : "今日经文",
       body: passage
         ? `${passage.reference}\n${(isEn ? passage.textEn : passage.textZh).slice(0, 80)}`
         : isEn ? "Start your devotional today" : "开始今天的灵修吧",
-      url: "/",
+      url,
     });
 
     let sent = 0;

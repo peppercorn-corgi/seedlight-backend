@@ -32,15 +32,17 @@ async function sendPush(
 
 /**
  * Pick a random devotional passage for push notification content.
+ * Returns the passage ID so the notification URL can deep-link to
+ * devotional card generation (/?devotional={id}).
  */
-async function pickPassage(language: string): Promise<{ ref: string; snippet: string } | null> {
+async function pickPassage(language: string): Promise<{ id: string; ref: string; snippet: string } | null> {
   const count = await prisma.devotionalPassage.count();
   if (count === 0) return null;
 
   const skip = Math.floor(Math.random() * count);
   const passage = await prisma.devotionalPassage.findFirst({
     skip,
-    select: { reference: true, textZh: true, textEn: true },
+    select: { id: true, reference: true, textZh: true, textEn: true },
   });
 
   if (!passage) return null;
@@ -48,7 +50,7 @@ async function pickPassage(language: string): Promise<{ ref: string; snippet: st
   const text = language === "en" ? passage.textEn : passage.textZh;
   // Truncate to ~80 chars for notification body
   const snippet = text.length > 80 ? text.slice(0, 77) + "..." : text;
-  return { ref: passage.reference, snippet };
+  return { id: passage.id, ref: passage.reference, snippet };
 }
 
 let running = false;
@@ -86,6 +88,9 @@ async function tickInner() {
     const lang = user.language === "en" ? "en" : "zh";
     const passage = await pickPassage(lang);
 
+    // Deep-link to devotional card generation when a passage is available
+    const url = passage ? `/?devotional=${passage.id}` : "/";
+
     const payload = {
       title: lang === "en" ? "Today's Scripture" : "今日经文",
       body: passage
@@ -93,7 +98,7 @@ async function tickInner() {
         : lang === "en"
           ? "Start your devotional today"
           : "开始今天的灵修吧",
-      url: "/",
+      url,
     };
 
     const subs = await prisma.pushSubscription.findMany({

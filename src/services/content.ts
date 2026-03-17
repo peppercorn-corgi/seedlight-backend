@@ -557,6 +557,178 @@ async function generateOptimized(
 }
 
 // =========================================================================
+// Devotional flow: push notification → auto-generate card (no mood context)
+//
+// Unlike the mood-based flows, devotional cards are generated for a specific
+// passage (chosen by the push scheduler) without any mood input. The prompts
+// are framed as a 灵修/quiet-time experience — reflective rather than
+// emotionally responsive.
+// =========================================================================
+
+function buildDevotionalSystemPrompt(segment: string): string {
+  const tone = TONE_GUIDE[segment] || TONE_GUIDE.seeker;
+  const secularLinkGuide = SECULAR_LINK_ZH[segment] || SECULAR_LINK_ZH.seeker;
+  const covenantGuide = COVENANT_ZH[segment] || COVENANT_ZH.seeker;
+
+  return `你是一位温柔、有智慧的牧者。你持守基督教新教基要派（Protestant fundamentalist）的神学立场，强调圣经的权威和福音的核心，但说话方式温和、不居高临下。
+
+**必须使用简体中文，不得使用繁体字。**
+
+重要背景：用户正在进行每日灵修，刚刚从推送通知中点击了一段经文。这不是情绪驱动的场景，而是一个安静反思的时刻——用户带着开放的心来聆听神的话语。
+你的核心任务是：
+1. 帮助用户深入理解这段经文的含义和背景
+2. 将经文的智慧自然地与日常生活联系起来
+3. 以"灵修陪伴者"的姿态出现——引导安静思考，而非解答具体困扰
+
+${HERMENEUTIC_ZH}
+
+我们的用户群体包括：尚未信主的慕道友、刚接触信仰的初信者、正在成长中的基督徒、以及成熟的信徒。你需要根据当前用户的信仰阶段调整语言和深度。
+
+语气要求：
+- 像一位关怀的牧者在晨间灵修中安静地分享，不是在讲台上讲道
+- 不要用"朋友"、"亲爱的"等称呼开头，直接进入内容
+- 语言温暖但不煽情，真诚但不说教
+- **简洁有力，适合手机碎片时间阅读，每个部分写成一段话**
+
+${tone}
+
+你将收到一段经文和已有的释经内容。请生成以下内容：
+${secularLinkGuide}
+
+${covenantGuide}
+
+格式要求：每个部分写成一段话，不要分成多个段落。在每段文字中，用 **加粗标记** 包裹1-2句最触动心灵的话（如"**这句话会被高亮**"）。高亮的必须是直接给人安慰、温暖或力量的句子——那种让人想停下来反复品味的话，而不是分析性、比较性或知识性的观点。段落之间用\\n\\n分隔。
+
+以JSON格式返回：{"secularLink":"...","covenant":"..."}
+只返回JSON，不要包含markdown代码块标记。`;
+}
+
+function buildDevotionalSystemPromptEn(segment: string): string {
+  const tone = TONE_GUIDE_EN[segment] || TONE_GUIDE_EN.seeker;
+  const secularLinkGuide = SECULAR_LINK_EN[segment] || SECULAR_LINK_EN.seeker;
+  const covenantGuide = COVENANT_EN[segment] || COVENANT_EN.seeker;
+
+  return `You are a gentle, wise pastor grounded in Protestant fundamentalist theology — affirming the authority of Scripture and the centrality of the Gospel. You speak warmly and without condescension.
+
+Important context: The user is doing their daily devotional — they just tapped a scripture passage from a push notification. This is not an emotion-driven scenario but a quiet, reflective moment — the user comes with an open heart to hear God's word.
+Your core task:
+1. Help the user deeply understand the passage's meaning and context
+2. Naturally connect the scripture's wisdom to everyday life
+3. Show up as a devotional companion — guiding quiet reflection, not addressing specific troubles
+
+${HERMENEUTIC_EN}
+
+Our users include: spiritually curious seekers, new believers, growing Christians, and mature believers. Adjust your language and depth to match the current user's faith stage.
+
+Tone requirements:
+- Speak like a caring pastor sharing during morning devotion, not a preacher at a pulpit
+- Do not open with "friend," "dear one," or similar salutations — go straight into the content
+- Warm but not sentimental; sincere but never preachy
+- **Be concise and impactful — designed for mobile reading in spare moments. Write each section as one paragraph.**
+
+${tone}
+
+You will receive a scripture passage and its pre-written exegesis. Generate the following:
+${secularLinkGuide}
+
+${covenantGuide}
+
+Format: write each section as a single paragraph. Within each paragraph, wrap 1-2 sentences in **bold markers** (e.g., "**this sentence will be highlighted**"). The highlighted text must be sentences that directly comfort, warm, or empower the reader — the kind of words that make someone pause and feel seen. Do NOT highlight analytical comparisons or intellectual observations. Separate sections with \\n\\n.
+
+Return as JSON: {"secularLink":"...","covenant":"..."}
+Return only the JSON — no markdown code block markers.`;
+}
+
+function buildDevotionalUserPrompt(
+  scriptureRef: string,
+  scriptureZh: string,
+  exegesis: string,
+): string {
+  return `经文: ${scriptureRef}\n${scriptureZh}\n\n释经:\n${exegesis}\n\n请生成文化连结和圣约内容。`;
+}
+
+function buildDevotionalUserPromptEn(
+  scriptureRef: string,
+  scriptureEn: string,
+  exegesis: string,
+): string {
+  return `Scripture: ${scriptureRef}\n${scriptureEn}\n\nExegesis:\n${exegesis}\n\nGenerate the cultural connection and covenant sections.`;
+}
+
+// ---------------------------------------------------------------------------
+// Devotional content generation — called from POST /api/devotional
+//
+// Looks up a specific passage by ID, fetches pre-gen exegesis, then calls
+// the LLM for secularLink + covenant (no personalLink since there's no mood
+// text). Falls back to legacy full-generation if no pre-gen exegesis exists.
+// ---------------------------------------------------------------------------
+export async function generateDevotionalContent(
+  userId: string,
+  passageId: string,
+) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  const language = user.language;
+  const useEnglish = language === "en" || language === "both";
+  const exegesisLang = useEnglish ? "en" : "zh";
+
+  // Fetch the specific passage (chosen by push scheduler)
+  const passage = await prisma.devotionalPassage.findUnique({
+    where: { id: passageId },
+  });
+  if (!passage) {
+    throw new Error(`Passage not found: ${passageId}`);
+  }
+
+  const displayRef = useEnglish ? buildEnglishRef(passage) : passage.reference;
+
+  // Try pre-generated exegesis first (optimized path)
+  const exegesis = await getPreGeneratedExegesis(passage.id, user.segment, exegesisLang);
+
+  if (exegesis) {
+    // Optimized path: pre-gen exegesis exists, only generate secularLink + covenant
+    const provider = getLlmProvider();
+    const systemPrompt = useEnglish
+      ? buildDevotionalSystemPromptEn(user.segment)
+      : buildDevotionalSystemPrompt(user.segment);
+    const userPrompt = useEnglish
+      ? buildDevotionalUserPromptEn(displayRef, passage.textEn, exegesis)
+      : buildDevotionalUserPrompt(passage.reference, passage.textZh, exegesis);
+
+    console.log(`[LLM:devotional] Generating secularLink+covenant for "${displayRef}", lang="${language}"`);
+    const startTime = Date.now();
+    const response = await provider.generate({
+      system: systemPrompt,
+      user: userPrompt,
+      maxTokens: 8000,
+    });
+    console.log(`[LLM:devotional] Done in ${((Date.now() - startTime) / 1000).toFixed(1)}s, model=${response.model}`);
+    console.log(`[LLM:devotional] Raw:\n${response.text}`);
+
+    const partial = parsePartialResponse(response.text, false);
+
+    return {
+      scriptureRef: displayRef,
+      scriptureZh: passage.textZh,
+      scriptureEn: passage.textEn,
+      exegesis,
+      secularLink: partial.secularLink,
+      covenant: partial.covenant,
+      verified: true,
+      aiModel: response.model,
+      language,
+    };
+  }
+
+  // Fallback: no pre-gen exegesis, use legacy full generation with devotional framing
+  // Reuse the legacy flow with a generic "devotional" mood — the passage is already chosen
+  console.log(`[devotional] No pre-gen exegesis for passage ${passageId}, falling back to legacy`);
+  const result = await generateLegacy(
+    userId, user.segment, "peaceful", passage.moodTags.slice(0, 3), language,
+  );
+  return { ...result, language };
+}
+
+// =========================================================================
 // Legacy flow: full LLM generation (fallback)
 // =========================================================================
 
