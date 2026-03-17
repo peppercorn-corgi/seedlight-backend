@@ -1,9 +1,12 @@
 /**
- * Devotional route — generates a ContentCard from a specific passage.
+ * Devotional route — generates a ContentCard for daily quiet-time.
  *
- * Called when a user taps a push notification. Unlike the mood flow, there is
- * no mood selection — we create a MoodEntry with moodType "devotional" to
- * maintain the existing ContentCard → MoodEntry → User ownership chain.
+ * Two entry points:
+ * 1. Push notification: passageId provided → generate card for that specific passage
+ * 2. "每日灵修" button: no passageId → server picks a random passage
+ *
+ * Creates a MoodEntry with moodType "devotional" to maintain the existing
+ * ContentCard → MoodEntry → User ownership chain without schema changes.
  */
 
 import { Router } from "express";
@@ -15,10 +18,58 @@ import { prisma } from "../lib/db.js";
 const router = Router();
 
 const devotionalSchema = z.object({
-  passageId: z.string().min(1),
+  // Optional: if omitted, server picks a random passage
+  passageId: z.string().min(1).optional(),
 });
 
-// POST /api/devotional — generate a devotional ContentCard for a specific passage
+/**
+ * Pick a random passage for the devotional button (no specific passage requested).
+ * Avoids passages the user has seen recently.
+ */
+async function pickRandomPassage(userId: string): Promise<string> {
+  // Get recently used scripture refs to avoid repetition
+  const recent = await prisma.contentCard.findMany({
+    where: { moodEntry: { userId } },
+    select: { scriptureRef: true },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+  });
+  const recentRefs = recent.map((c) => c.scriptureRef);
+
+  // Pick from passages not recently used, weighted by importance
+  const candidates = await prisma.devotionalPassage.findMany({
+    where: recentRefs.length > 0 ? { reference: { notIn: recentRefs } } : {},
+    orderBy: { importance: "desc" },
+    take: 50,
+    select: { id: true, importance: true },
+  });
+
+  if (candidates.length === 0) {
+    // All passages used recently — just pick any
+    const fallback = await prisma.devotionalPassage.findFirst({
+      orderBy: { importance: "desc" },
+      select: { id: true },
+    });
+    if (!fallback) throw new Error("No devotional passages in database");
+    return fallback.id;
+  }
+
+  // Weighted random by importance
+  const weights = candidates.map((c) => c.importance);
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  let roll = Math.random() * totalWeight;
+  for (let i = 0; i < candidates.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) return candidates[i].id;
+  }
+  return candidates[0].id;
+}
+
+// POST /api/devotional — generate a devotional ContentCard
+//
+// Body: { passageId?: string }
+// - With passageId: generate for that specific passage (push notification flow)
+// - Without passageId: pick a random passage (每日灵修 button flow)
 router.post("/", requireAuth, async (req, res, next) => {
   try {
     const parsed = devotionalSchema.safeParse(req.body);
@@ -33,7 +84,8 @@ router.post("/", requireAuth, async (req, res, next) => {
       return;
     }
 
-    const { passageId } = parsed.data;
+    // Resolve passageId: use provided or pick random
+    const passageId = parsed.data.passageId || await pickRandomPassage(user.id);
 
     // Dedup: if user already has a devotional card for this passage today, return it
     const todayStart = new Date();
@@ -45,8 +97,6 @@ router.post("/", requireAuth, async (req, res, next) => {
           moodType: "devotional",
           createdAt: { gte: todayStart },
         },
-        // Match by scripture reference from the passage
-        // (passageId isn't stored on ContentCard, so we check via the passage's reference)
       },
       include: {
         moodEntry: {
@@ -72,7 +122,7 @@ router.post("/", requireAuth, async (req, res, next) => {
       }
     }
 
-    // Generate devotional content for this specific passage
+    // Generate devotional content for this passage
     const content = await generateDevotionalContent(user.id, passageId);
 
     // Create a MoodEntry with moodType "devotional" to maintain the
